@@ -54,17 +54,27 @@ python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --config-env "$OBS_CONFIG_FI
 singbox_check "$SINGBOX_CONFIG_PATH"
 
 if [[ "$RESTART_SINGBOX" == "true" ]]; then
-  info "sing-box check 已通过，重启 sing-box。"
+  if is_dry_run; then
+    info "DRY-RUN: sing-box check 未实际执行；不会重启 sing-box，只展示将执行的命令。"
+  else
+    info "sing-box check 已通过，重启 sing-box。"
+  fi
   restart_singbox
 fi
 
-if ! is_dry_run; then
+if is_dry_run; then
+  info "DRY-RUN: 跳过 sing-box systemd 状态、监听端口和家宽代理实测。"
+else
   info "检查 sing-box systemd 状态。"
   systemctl status sing-box --no-pager 2>&1 | tee -a "$LOG_FILE" || die "sing-box systemd 状态异常"
 fi
 
 mapfile -t PORTS < <(python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --config-env "$OBS_CONFIG_FILE" --print-ports)
-info "检查监听端口：${PORTS[*]}"
+if is_dry_run; then
+  info "DRY-RUN: 实际运行后应监听端口：${PORTS[*]}"
+else
+  info "检查监听端口：${PORTS[*]}"
+fi
 if ! is_dry_run; then
   ss -lntp 2>&1 | tee -a "$LOG_FILE" | grep -E 'sing-box|State|LISTEN' >/dev/null || true
   for port in "${PORTS[@]}"; do
