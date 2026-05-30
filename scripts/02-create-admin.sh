@@ -38,10 +38,9 @@ create_user_if_needed() {
 install_authorized_keys() {
   local user="$1" key_text="$2"
   local home
-  home="$(getent passwd "$user" | cut -d: -f6)"
-  [[ -n "$home" ]] || die "无法获取 $user 的 home"
+  home="$(user_home "$user")"
   if is_dry_run; then
-    log "DRY-RUN: install authorized_keys for $user"
+    log "DRY-RUN: install authorized_keys for $user at $home/.ssh/authorized_keys"
     return 0
   fi
   install -d -m 700 -o "$user" -g "$user" "$home/.ssh"
@@ -98,12 +97,18 @@ if [[ "$ENABLE_SFTP_USER" == "true" ]]; then
   fi
 fi
 
+if [[ "$ENABLE_SFTP_USER" == "true" ]]; then
+  sftp_status="true ($SFTP_USER)"
+else
+  sftp_status="false"
+fi
+
 cat <<EOF
 
 用户准备完成：
   管理用户：$ADMIN_USER
   sudo NOPASSWD：$ADMIN_SUDO_NOPASSWD
-  SFTP 用户：$ENABLE_SFTP_USER${ENABLE_SFTP_USER:+ ($SFTP_USER)}
+  SFTP 用户：$sftp_status
 
 下一步会写入 phase1 SSH drop-in，只开启公钥登录，不禁 root/密码。
 EOF

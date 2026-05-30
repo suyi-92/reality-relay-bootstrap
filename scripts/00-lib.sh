@@ -39,6 +39,25 @@ run() {
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
+user_home() {
+  local user="$1" entry home
+  entry="$(getent passwd "$user" || true)"
+  if [[ -n "$entry" ]]; then
+    local _name _passwd _uid _gid _gecos _shell
+    IFS=: read -r _name _passwd _uid _gid _gecos home _shell <<<"$entry"
+    [[ -n "$home" ]] || die "无法获取 $user 的 home"
+    printf '%s\n' "$home"
+    return 0
+  fi
+
+  if is_dry_run; then
+    printf '/home/%s\n' "$user"
+    return 0
+  fi
+
+  die "用户不存在，无法获取 home：$user"
+}
+
 apt_install() {
   require_root
   export DEBIAN_FRONTEND=noninteractive
@@ -200,7 +219,13 @@ backup_path() {
 }
 
 ssh_service_name() {
-  if systemctl list-unit-files 2>/dev/null | grep -q '^ssh\.service'; then
+  local units
+  units="$(systemctl list-unit-files 2>/dev/null || true)"
+  if grep -q '^ssh\.service' <<<"$units"; then
+    echo ssh
+  elif grep -q '^sshd\.service' <<<"$units"; then
+    echo sshd
+  elif systemctl status ssh >/dev/null 2>&1; then
     echo ssh
   else
     echo sshd
