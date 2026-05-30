@@ -8,7 +8,7 @@ log-level: info
 ipv6: false
 
 proxies:
-  - name: Relay-Direct-443
+  - name: my-vps
     type: vless
     server: YOUR_SERVER_IP
     port: 443
@@ -29,7 +29,7 @@ proxy-groups:
   - name: PROXY
     type: select
     proxies:
-      - Relay-Direct-443
+      - my-vps
       - DIRECT
 
 rules:
