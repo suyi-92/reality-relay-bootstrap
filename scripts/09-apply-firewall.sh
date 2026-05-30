@@ -2,7 +2,7 @@
 # 配置 UFW：只开放 SSH、443/DIRECT_PORT 和 CSV 实际使用端口。
 set -Eeuo pipefail
 PHASE_NAME="firewall"
-source "${OBS_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}/scripts/00-lib.sh"
+source "${RRB_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}/scripts/00-lib.sh"
 require_root
 load_config
 require_supported_os
@@ -14,14 +14,14 @@ fi
 
 bash "$SCRIPT_DIR/06-install-ufw.sh"
 
-mapfile -t PORTS < <(python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --config-env "$OBS_CONFIG_FILE" --print-ports)
+mapfile -t PORTS < <(python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --config-env "$RRB_CONFIG_FILE" --print-ports)
 [[ "${#PORTS[@]}" -ge 1 ]] || die "未解析到 VLESS+Reality 端口。"
 
 info "准备开放实际使用的 VLESS+Reality TCP 端口：${PORTS[*]}"
 for port in "${PORTS[@]}"; do
   validate_port_value="$port"
   [[ "$validate_port_value" =~ ^[0-9]+$ ]] || die "端口不是数字：$port"
-  run ufw allow "${port}/tcp" comment "our-server-bootstrap sing-box VLESS+Reality ${port}"
+  run ufw allow "${port}/tcp" comment "reality-relay-bootstrap sing-box VLESS+Reality ${port}"
 done
 
 

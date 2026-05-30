@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# our-server-bootstrap 总入口。所有危险步骤都拆成阶段执行，避免一次性锁机。
+# reality-relay-bootstrap 总入口。所有危险步骤都拆成阶段执行，避免一次性锁机。
 set -Eeuo pipefail
 
 PROJECT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT_DIR="$PROJECT_DIR/scripts"
-export OBS_PROJECT_DIR="$PROJECT_DIR"
+export RRB_PROJECT_DIR="$PROJECT_DIR"
 
 PHASE=""
-OBS_CONFIG_FILE="$PROJECT_DIR/config.env"
-OBS_DRY_RUN="false"
-OBS_YES="false"
-export OBS_CONFIG_FILE OBS_DRY_RUN OBS_YES
+RRB_CONFIG_FILE="$PROJECT_DIR/config.env"
+RRB_DRY_RUN="false"
+RRB_YES="false"
+export RRB_CONFIG_FILE RRB_DRY_RUN RRB_YES
 
 usage() {
   cat <<'EOF'
@@ -24,7 +24,7 @@ Phases:
   singbox         安装 sing-box、生成 VLESS+Reality 多入口配置并重启
   firewall        安装/配置 UFW，只开放 SSH、443 和 CSV 实际端口
   validate        验证 SSH、fail2ban、UFW、sing-box、监听端口和家宽代理
-  output-nodes    生成 /root/our-singbox-nodes.txt 与 /root/our-singbox-clash.yaml
+  output-nodes    生成 /root/reality-relay-bootstrap-nodes.txt 与 /root/reality-relay-bootstrap-clash.yaml
   rollback        回滚 SSH 加固、sing-box 配置；可选处理 UFW
 EOF
 }
@@ -32,9 +32,9 @@ EOF
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --phase) PHASE="${2:-}"; shift 2 ;;
-    --config) OBS_CONFIG_FILE="${2:-}"; export OBS_CONFIG_FILE; shift 2 ;;
-    --dry-run) OBS_DRY_RUN="true"; export OBS_DRY_RUN; shift ;;
-    --yes|-y) OBS_YES="true"; export OBS_YES; shift ;;
+    --config) RRB_CONFIG_FILE="${2:-}"; export RRB_CONFIG_FILE; shift 2 ;;
+    --dry-run) RRB_DRY_RUN="true"; export RRB_DRY_RUN; shift ;;
+    --yes|-y) RRB_YES="true"; export RRB_YES; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; usage; exit 2 ;;
   esac
@@ -58,7 +58,7 @@ case "$PHASE" in
   fail2ban) run_phase 05-install-fail2ban.sh ;;
   singbox)
     run_phase 07-install-singbox.sh
-    python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --config-env "$OBS_CONFIG_FILE" --write
+    python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --config-env "$RRB_CONFIG_FILE" --write
     run_phase 10-validate.sh --singbox-only --skip-proxy-tests --restart-singbox
     run_phase 11-output-nodes-wrapper.sh
     ;;

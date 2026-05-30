@@ -166,8 +166,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config-env", required=True)
     ap.add_argument("--generator", required=True)
-    ap.add_argument("--nodes-out", default="/root/our-singbox-nodes.txt")
-    ap.add_argument("--clash-out", default="/root/our-singbox-clash.yaml")
+    ap.add_argument("--nodes-out", default="/root/reality-relay-bootstrap-nodes.txt")
+    ap.add_argument("--clash-out", default="/root/reality-relay-bootstrap-clash.yaml")
     args = ap.parse_args()
 
     env_path = Path(args.config_env).resolve()

@@ -7,16 +7,16 @@
 ## 设计原则
 
 1. **不锁机优先**：SSH 拆成 phase1 和 final。phase1 只创建用户并开启公钥登录，不禁 root、不禁密码。只有另开窗口确认 admin key 登录成功后，才能用 `CONFIRM_ADMIN_KEY_LOGIN=yes` 执行 final。
-2. **先备份后修改**：SSH、fail2ban、UFW、sing-box 配置都会备份到 `/root/our-server-bootstrap-backups/`。
+2. **先备份后修改**：SSH、fail2ban、UFW、sing-box 配置都会备份到 `/root/reality-relay-bootstrap-backups/`。
 3. **先检查后重启**：`sshd -t` 通过后才 reload SSH；`sing-box check -c /etc/sing-box/config.json` 通过后才 restart sing-box。
 4. **默认最小开放端口**：UFW 只放行当前 SSH 端口、`DIRECT_PORT`、CSV 里的实际 `listen_port`，不默认开放整个 51043-51060 范围。
-5. **敏感信息不进普通日志**：VLESS UUID、Reality 私钥、家宽代理密码不会打印到 `/var/log/our-server-bootstrap.log`。节点输出文件权限为 600。
+5. **敏感信息不进普通日志**：VLESS UUID、Reality 私钥、家宽代理密码不会打印到 `/var/log/reality-relay-bootstrap.log`。节点输出文件权限为 600。
 6. **233boy 可选且不强依赖**：默认使用 sing-box 官方 APT 源。只有显式启用 `USE_233BOY_INSTALLER=true` 并设置 `CONFIRM_USE_233BOY_INSTALLER=yes` 时才调用 233boy 安装脚本。调用后会隔离 `/etc/sing-box/conf`，由本项目接管 `/etc/sing-box/config.json`。
 
 ## 项目结构
 
 ```text
-our-server-bootstrap/
+reality-relay-bootstrap/
   README.md
   config.example.env
   home-proxies.example.csv
@@ -51,8 +51,8 @@ our-server-bootstrap/
 ```bash
 sudo apt update
 sudo apt install -y unzip nano
-unzip our-server-bootstrap-vless-reality.zip
-cd our-server-bootstrap
+unzip reality-relay-bootstrap.zip
+cd reality-relay-bootstrap
 
 cp config.example.env config.env
 nano config.env
@@ -88,11 +88,12 @@ MODE_443="direct"
 
 ```bash
 PROXY_PROTOCOL="vless-reality"
-VLESS_UUID_PATH="/etc/our-singbox/vless-uuid.txt"
+RRB_STATE_DIR="/etc/reality-relay-bootstrap"
+VLESS_UUID_PATH="/etc/reality-relay-bootstrap/vless-uuid.txt"
 VLESS_FLOW="xtls-rprx-vision"
-REALITY_PRIVATE_KEY_PATH="/etc/our-singbox/reality-private.key"
-REALITY_PUBLIC_KEY_PATH="/etc/our-singbox/reality-public.key"
-REALITY_SHORT_ID_PATH="/etc/our-singbox/reality-short-id.txt"
+REALITY_PRIVATE_KEY_PATH="/etc/reality-relay-bootstrap/reality-private.key"
+REALITY_PUBLIC_KEY_PATH="/etc/reality-relay-bootstrap/reality-public.key"
+REALITY_SHORT_ID_PATH="/etc/reality-relay-bootstrap/reality-short-id.txt"
 REALITY_SERVER_NAME="www.microsoft.com"
 REALITY_HANDSHAKE_SERVER="www.microsoft.com"
 REALITY_HANDSHAKE_PORT="443"
@@ -105,13 +106,13 @@ CLIENT_ALPN="h2,http/1.1"
 首次执行 `--phase singbox` 会自动生成：
 
 ```text
-/etc/our-singbox/vless-uuid.txt
-/etc/our-singbox/reality-private.key
-/etc/our-singbox/reality-public.key
-/etc/our-singbox/reality-short-id.txt
+/etc/reality-relay-bootstrap/vless-uuid.txt
+/etc/reality-relay-bootstrap/reality-private.key
+/etc/reality-relay-bootstrap/reality-public.key
+/etc/reality-relay-bootstrap/reality-short-id.txt
 ```
 
-这些文件权限为 600。不要公开 Reality 私钥、UUID、CSV 和节点文件。
+这些文件权限为 600。`home-proxies.csv` 也会以 600 权限复制到 `/etc/reality-relay-bootstrap/home-proxies.csv`。不要公开 Reality 私钥、UUID、CSV 和节点文件。
 
 ## 443 模式
 
@@ -220,8 +221,8 @@ sudo bash bootstrap.sh --phase output-nodes
 ## 查看节点信息
 
 ```bash
-sudo cat /root/our-singbox-nodes.txt
-sudo cat /root/our-singbox-clash.yaml
+sudo cat /root/reality-relay-bootstrap-nodes.txt
+sudo cat /root/reality-relay-bootstrap-clash.yaml
 ```
 
 输出节点包括：
@@ -300,6 +301,8 @@ sudo CONFIRM_ROLLBACK=yes bash bootstrap.sh --phase rollback
 ```bash
 sudo CONFIRM_ROLLBACK=yes RESTORE_FULL_SSH_BACKUP=yes bash bootstrap.sh --phase rollback
 sudo CONFIRM_ROLLBACK=yes ROLLBACK_DISABLE_UFW=yes bash bootstrap.sh --phase rollback
+sudo CONFIRM_ROLLBACK=yes RESTORE_UFW_FROM_BACKUP=yes bash bootstrap.sh --phase rollback
+sudo CONFIRM_ROLLBACK=yes ROLLBACK_BACKUP_DIR=/root/reality-relay-bootstrap-backups/backup-xxxx bash bootstrap.sh --phase rollback
 sudo CONFIRM_ROLLBACK=yes RESTORE_233BOY_CONF=yes bash bootstrap.sh --phase rollback
 ```
 
@@ -307,8 +310,9 @@ sudo CONFIRM_ROLLBACK=yes RESTORE_233BOY_CONF=yes bash bootstrap.sh --phase roll
 
 不要公开：
 
-- `/etc/our-singbox/vless-uuid.txt`
-- `/etc/our-singbox/reality-private.key`
+- `/etc/reality-relay-bootstrap/vless-uuid.txt`
+- `/etc/reality-relay-bootstrap/reality-private.key`
 - `home-proxies.csv`
-- `/root/our-singbox-nodes.txt`
-- `/root/our-singbox-clash.yaml`
+- `/etc/reality-relay-bootstrap/home-proxies.csv`
+- `/root/reality-relay-bootstrap-nodes.txt`
+- `/root/reality-relay-bootstrap-clash.yaml`

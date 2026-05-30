@@ -3,8 +3,8 @@
 部署后生成：
 
 ```bash
-/root/our-singbox-nodes.txt
-/root/our-singbox-clash.yaml
+/root/reality-relay-bootstrap-nodes.txt
+/root/reality-relay-bootstrap-clash.yaml
 ```
 
 两个文件包含 VLESS UUID、Reality public key、short-id 等节点信息，权限为 600，不要公开。
@@ -50,7 +50,7 @@ Test-NetConnection 服务器IP -Port 51043
 
 ## Clash/Mihomo 测出口 IP
 
-导入 `/root/our-singbox-clash.yaml` 后，在本地执行：
+导入 `/root/reality-relay-bootstrap-clash.yaml` 后，在本地执行：
 
 ```powershell
 curl.exe -x http://127.0.0.1:7890 https://ifconfig.me

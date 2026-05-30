@@ -2,19 +2,20 @@
 # 公共库：日志、配置加载、校验、备份、执行封装。
 set -Eeuo pipefail
 
-OBS_PROJECT_DIR="${OBS_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
-OBS_CONFIG_FILE="${OBS_CONFIG_FILE:-$OBS_PROJECT_DIR/config.env}"
-OBS_DRY_RUN="${OBS_DRY_RUN:-false}"
-OBS_YES="${OBS_YES:-false}"
-SCRIPT_DIR="$OBS_PROJECT_DIR/scripts"
-LOG_FILE="/var/log/our-server-bootstrap.log"
-BACKUP_ROOT="/root/our-server-bootstrap-backups"
+RRB_PROJECT_DIR="${RRB_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
+RRB_CONFIG_FILE="${RRB_CONFIG_FILE:-$RRB_PROJECT_DIR/config.env}"
+RRB_DRY_RUN="${RRB_DRY_RUN:-false}"
+RRB_YES="${RRB_YES:-false}"
+export RRB_PROJECT_DIR RRB_CONFIG_FILE RRB_DRY_RUN RRB_YES
+SCRIPT_DIR="$RRB_PROJECT_DIR/scripts"
+LOG_FILE="/var/log/reality-relay-bootstrap.log"
+BACKUP_ROOT="/root/reality-relay-bootstrap-backups"
 PHASE_NAME="${PHASE_NAME:-manual}"
 BACKUP_DIR="${BACKUP_DIR:-}"
 
 if [[ ${EUID:-$(id -u)} -ne 0 ]]; then
-  LOG_FILE="/tmp/our-server-bootstrap.log"
-  BACKUP_ROOT="/tmp/our-server-bootstrap-backups"
+  LOG_FILE="/tmp/reality-relay-bootstrap.log"
+  BACKUP_ROOT="/tmp/reality-relay-bootstrap-backups"
 fi
 
 trap 'rc=$?; echo "[ERROR] line=${LINENO} cmd=${BASH_COMMAND} rc=${rc}" >&2; exit $rc' ERR
@@ -25,7 +26,7 @@ info() { log "INFO: $*"; }
 warn() { log "WARN: $*"; }
 die() { log "ERROR: $*"; exit 1; }
 
-is_dry_run() { [[ "$OBS_DRY_RUN" == "true" ]]; }
+is_dry_run() { [[ "$RRB_DRY_RUN" == "true" ]]; }
 require_root() { [[ $EUID -eq 0 ]] || die "必须以 root 运行：sudo bash bootstrap.sh ..."; }
 
 run() {
@@ -70,10 +71,10 @@ apt_install() {
 }
 
 load_config() {
-  [[ -f "$OBS_CONFIG_FILE" ]] || die "找不到配置文件：$OBS_CONFIG_FILE；请先 cp config.example.env config.env"
+  [[ -f "$RRB_CONFIG_FILE" ]] || die "找不到配置文件：$RRB_CONFIG_FILE；请先 cp config.example.env config.env"
   set -a
   # shellcheck disable=SC1090
-  source "$OBS_CONFIG_FILE"
+  source "$RRB_CONFIG_FILE"
   set +a
 
   : "${SERVER_ALIAS:=my-vps}"
@@ -97,13 +98,23 @@ load_config() {
   : "${ENABLE_IPV6_LISTEN:=false}"
   : "${ADMIN_SUDO_NOPASSWD:=true}"
   : "${CSV_PATH:=./home-proxies.csv}"
-  : "${OUR_STATE_DIR:=/etc/our-singbox}"
+  : "${RRB_STATE_DIR:=/etc/reality-relay-bootstrap}"
+  export RRB_STATE_DIR
   : "${SINGBOX_CONFIG_PATH:=/etc/sing-box/config.json}"
-  : "${VLESS_UUID_PATH:=/etc/our-singbox/vless-uuid.txt}"
+  : "${VLESS_UUID_PATH:=$RRB_STATE_DIR/vless-uuid.txt}"
   : "${VLESS_FLOW:=xtls-rprx-vision}"
-  : "${REALITY_PRIVATE_KEY_PATH:=/etc/our-singbox/reality-private.key}"
-  : "${REALITY_PUBLIC_KEY_PATH:=/etc/our-singbox/reality-public.key}"
-  : "${REALITY_SHORT_ID_PATH:=/etc/our-singbox/reality-short-id.txt}"
+  : "${REALITY_PRIVATE_KEY_PATH:=$RRB_STATE_DIR/reality-private.key}"
+  : "${REALITY_PUBLIC_KEY_PATH:=$RRB_STATE_DIR/reality-public.key}"
+  : "${REALITY_SHORT_ID_PATH:=$RRB_STATE_DIR/reality-short-id.txt}"
+
+  DEFAULT_RRB_STATE_DIR="/etc/reality-relay-bootstrap"
+  if [[ "$RRB_STATE_DIR" != "$DEFAULT_RRB_STATE_DIR" ]]; then
+    [[ "$VLESS_UUID_PATH" == "$DEFAULT_RRB_STATE_DIR/vless-uuid.txt" ]] && VLESS_UUID_PATH="$RRB_STATE_DIR/vless-uuid.txt"
+    [[ "$REALITY_PRIVATE_KEY_PATH" == "$DEFAULT_RRB_STATE_DIR/reality-private.key" ]] && REALITY_PRIVATE_KEY_PATH="$RRB_STATE_DIR/reality-private.key"
+    [[ "$REALITY_PUBLIC_KEY_PATH" == "$DEFAULT_RRB_STATE_DIR/reality-public.key" ]] && REALITY_PUBLIC_KEY_PATH="$RRB_STATE_DIR/reality-public.key"
+    [[ "$REALITY_SHORT_ID_PATH" == "$DEFAULT_RRB_STATE_DIR/reality-short-id.txt" ]] && REALITY_SHORT_ID_PATH="$RRB_STATE_DIR/reality-short-id.txt"
+  fi
+
   : "${REALITY_SERVER_NAME:=www.microsoft.com}"
   : "${REALITY_HANDSHAKE_SERVER:=www.microsoft.com}"
   : "${REALITY_HANDSHAKE_PORT:=443}"
@@ -168,7 +179,7 @@ validate_config_basics() {
 
 resolve_csv_path() {
   if [[ "$CSV_PATH" != /* ]]; then
-    CSV_PATH="$OBS_PROJECT_DIR/${CSV_PATH#./}"
+    CSV_PATH="$RRB_PROJECT_DIR/${CSV_PATH#./}"
   fi
   export CSV_PATH
 }
@@ -198,7 +209,7 @@ init_backup_dir() {
   else
     mkdir -p "$BACKUP_DIR"
     chmod 700 "$BACKUP_ROOT" "$BACKUP_DIR" 2>/dev/null || true
-    printf 'phase=%s\ndate=%s\nconfig=%s\n' "$PHASE_NAME" "$(_ts)" "$OBS_CONFIG_FILE" > "$BACKUP_DIR/MANIFEST.txt"
+    printf 'phase=%s\ndate=%s\nconfig=%s\n' "$PHASE_NAME" "$(_ts)" "$RRB_CONFIG_FILE" > "$BACKUP_DIR/MANIFEST.txt"
   fi
   export BACKUP_DIR
 }

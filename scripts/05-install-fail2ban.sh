@@ -2,7 +2,7 @@
 # 安装并配置 fail2ban 的 sshd jail。
 set -Eeuo pipefail
 PHASE_NAME="fail2ban"
-source "${OBS_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}/scripts/00-lib.sh"
+source "${RRB_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}/scripts/00-lib.sh"
 require_root
 load_config
 require_supported_os
@@ -21,7 +21,7 @@ else
   mkdir -p /etc/fail2ban/jail.d
 fi
 write_root_file /etc/fail2ban/jail.d/sshd.local 0644 <<EOF
-# Managed by our-server-bootstrap.
+# Managed by reality-relay-bootstrap.
 [DEFAULT]
 ignoreip = 127.0.0.1/8 ::1
 bantime = 1h

@@ -2,7 +2,7 @@
 # 创建 admin 管理用户和可选 SFTP-only 用户，安装 SSH 公钥。
 set -Eeuo pipefail
 PHASE_NAME="create-admin"
-source "${OBS_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}/scripts/00-lib.sh"
+source "${RRB_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}/scripts/00-lib.sh"
 require_root
 load_config
 require_supported_os
@@ -71,12 +71,12 @@ run passwd -l "$ADMIN_USER" || true
 install_authorized_keys "$ADMIN_USER" "$admin_keys"
 
 if [[ "$ADMIN_SUDO_NOPASSWD" == "true" ]]; then
-  write_root_file "/etc/sudoers.d/90-our-${ADMIN_USER}" 0440 <<EOF
-# Managed by our-server-bootstrap. Admin password is locked; sudo uses key-protected SSH login.
+  write_root_file "/etc/sudoers.d/90-reality-relay-bootstrap-${ADMIN_USER}" 0440 <<EOF
+# Managed by reality-relay-bootstrap. Admin password is locked; sudo uses key-protected SSH login.
 ${ADMIN_USER} ALL=(ALL) NOPASSWD:ALL
 EOF
   if ! is_dry_run; then
-    visudo -cf "/etc/sudoers.d/90-our-${ADMIN_USER}" >/dev/null
+    visudo -cf "/etc/sudoers.d/90-reality-relay-bootstrap-${ADMIN_USER}" >/dev/null
   fi
 fi
 

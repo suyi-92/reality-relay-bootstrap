@@ -1,4 +1,4 @@
-# /etc/ssh/sshd_config.d/00-our-server-bootstrap-hardening.conf
+# /etc/ssh/sshd_config.d/00-reality-relay-bootstrap-hardening.conf
 # Template only. The script renders ADMIN_USER/SFTP_USER dynamically.
 
 PermitRootLogin no

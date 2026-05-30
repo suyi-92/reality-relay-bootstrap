@@ -2,7 +2,7 @@
 # 验证 SSH、fail2ban、UFW、sing-box、监听端口和家宽代理可用性。
 set -Eeuo pipefail
 PHASE_NAME="validate"
-source "${OBS_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}/scripts/00-lib.sh"
+source "${RRB_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}/scripts/00-lib.sh"
 require_root
 load_config
 
@@ -50,7 +50,7 @@ if [[ "$SINGBOX_ONLY" != "true" ]]; then
 fi
 
 info "检查 sing-box 配置语法。"
-python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --config-env "$OBS_CONFIG_FILE" --check-only
+python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --config-env "$RRB_CONFIG_FILE" --check-only
 singbox_check "$SINGBOX_CONFIG_PATH"
 
 if [[ "$RESTART_SINGBOX" == "true" ]]; then
@@ -69,7 +69,7 @@ else
   systemctl status sing-box --no-pager 2>&1 | tee -a "$LOG_FILE" || die "sing-box systemd 状态异常"
 fi
 
-mapfile -t PORTS < <(python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --config-env "$OBS_CONFIG_FILE" --print-ports)
+mapfile -t PORTS < <(python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --config-env "$RRB_CONFIG_FILE" --print-ports)
 if is_dry_run; then
   info "DRY-RUN: 实际运行后应监听端口：${PORTS[*]}"
 else
@@ -89,7 +89,7 @@ fi
 if [[ "$SKIP_PROXY_TESTS" != "true" ]]; then
   info "测试每个家宽代理本身是否可用；不会把代理密码写入日志。"
   if ! is_dry_run; then
-    python3 - "$OBS_CONFIG_FILE" "$SCRIPT_DIR/08-generate-singbox-config.py" <<'PY'
+    python3 - "$RRB_CONFIG_FILE" "$SCRIPT_DIR/08-generate-singbox-config.py" <<'PY'
 import importlib.util
 import subprocess
 import sys

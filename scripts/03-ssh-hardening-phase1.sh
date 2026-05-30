@@ -2,7 +2,7 @@
 # SSH Phase1：只保证公钥登录开启；绝不禁 root/密码。
 set -Eeuo pipefail
 PHASE_NAME="ssh-phase1"
-source "${OBS_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}/scripts/00-lib.sh"
+source "${RRB_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}/scripts/00-lib.sh"
 require_root
 load_config
 
@@ -10,8 +10,9 @@ backup_path /etc/ssh/sshd_config
 [[ -d /etc/ssh/sshd_config.d ]] && backup_path /etc/ssh/sshd_config.d
 ensure_sshd_dropin_include
 
-write_root_file /etc/ssh/sshd_config.d/00-our-server-bootstrap-phase1.conf 0644 <<'EOF'
-# Managed by our-server-bootstrap phase1.
+
+write_root_file /etc/ssh/sshd_config.d/00-reality-relay-bootstrap-phase1.conf 0644 <<'EOF'
+# Managed by reality-relay-bootstrap phase1.
 # Phase1 only enables public key authentication. It intentionally does NOT
 # disable root login or password login. Final hardening is a separate phase.
 PubkeyAuthentication yes

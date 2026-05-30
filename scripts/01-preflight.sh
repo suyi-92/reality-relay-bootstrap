@@ -2,7 +2,7 @@
 # 系统和配置预检查：不做危险加固。
 set -Eeuo pipefail
 PHASE_NAME="preflight"
-source "${OBS_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}/scripts/00-lib.sh"
+source "${RRB_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}/scripts/00-lib.sh"
 require_root
 load_config
 require_supported_os
@@ -31,7 +31,7 @@ if port_in_use_by_other "$DIRECT_PORT"; then
   die "DIRECT_PORT=$DIRECT_PORT 已被非 sing-box 进程占用。请停止占用服务或修改端口。"
 fi
 
-python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --config-env "$OBS_CONFIG_FILE" --check-only
+python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --config-env "$RRB_CONFIG_FILE" --check-only
 
 cat <<EOF
 

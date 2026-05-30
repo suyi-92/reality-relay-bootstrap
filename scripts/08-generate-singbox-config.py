@@ -125,6 +125,7 @@ def parse_env_file(path: Path) -> Dict[str, str]:
 
 def defaults(env: Dict[str, str]) -> Dict[str, str]:
     merged = dict(env)
+    state_dir = merged.get("RRB_STATE_DIR") or "/etc/reality-relay-bootstrap"
     d = {
         "SERVER_ALIAS": "my-vps",
         "SERVER_IP": "",
@@ -145,13 +146,13 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
         "ENABLE_FAIL2BAN": "true",
         "ENABLE_IPV6_LISTEN": "false",
         "CSV_PATH": "./home-proxies.csv",
-        "OUR_STATE_DIR": "/etc/our-singbox",
+        "RRB_STATE_DIR": state_dir,
         "SINGBOX_CONFIG_PATH": "/etc/sing-box/config.json",
-        "VLESS_UUID_PATH": "/etc/our-singbox/vless-uuid.txt",
+        "VLESS_UUID_PATH": f"{state_dir}/vless-uuid.txt",
         "VLESS_FLOW": "xtls-rprx-vision",
-        "REALITY_PRIVATE_KEY_PATH": "/etc/our-singbox/reality-private.key",
-        "REALITY_PUBLIC_KEY_PATH": "/etc/our-singbox/reality-public.key",
-        "REALITY_SHORT_ID_PATH": "/etc/our-singbox/reality-short-id.txt",
+        "REALITY_PRIVATE_KEY_PATH": f"{state_dir}/reality-private.key",
+        "REALITY_PUBLIC_KEY_PATH": f"{state_dir}/reality-public.key",
+        "REALITY_SHORT_ID_PATH": f"{state_dir}/reality-short-id.txt",
         "REALITY_SERVER_NAME": "www.microsoft.com",
         "REALITY_HANDSHAKE_SERVER": "www.microsoft.com",
         "REALITY_HANDSHAKE_PORT": "443",
@@ -165,6 +166,18 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
     }
     for k, v in d.items():
         merged.setdefault(k, v)
+
+    default_state_dir = "/etc/reality-relay-bootstrap"
+    if merged["RRB_STATE_DIR"] != default_state_dir:
+        default_paths = {
+            "VLESS_UUID_PATH": "vless-uuid.txt",
+            "REALITY_PRIVATE_KEY_PATH": "reality-private.key",
+            "REALITY_PUBLIC_KEY_PATH": "reality-public.key",
+            "REALITY_SHORT_ID_PATH": "reality-short-id.txt",
+        }
+        for key, filename in default_paths.items():
+            if merged.get(key) == f"{default_state_dir}/{filename}":
+                merged[key] = f"{merged['RRB_STATE_DIR']}/{filename}"
     return merged
 
 
@@ -239,7 +252,7 @@ def iter_csv_lines(path: Path) -> Iterable[str]:
 def load_rows(env: Dict[str, str], base: Path, allow_empty: bool = True) -> List[Dict[str, Any]]:
     csv_path = resolve_path(env, "CSV_PATH", base)
     if not csv_path.exists():
-        state_csv = Path(env["OUR_STATE_DIR"]) / "home-proxies.csv"
+        state_csv = Path(env["RRB_STATE_DIR"]) / "home-proxies.csv"
         if state_csv.exists():
             csv_path = state_csv
         else:
@@ -610,7 +623,7 @@ def main() -> int:
         return 0
 
     if args.write:
-        if os.environ.get("OBS_DRY_RUN") == "true":
+        if os.environ.get("RRB_DRY_RUN") == "true":
             print("DRY-RUN: 将生成 VLESS+Reality sing-box 配置，但不会写入文件。")
             print_summary(env, rows)
             return 0

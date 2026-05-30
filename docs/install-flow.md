@@ -45,12 +45,12 @@ sudo bash bootstrap.sh --phase singbox
 此阶段会：
 
 1. 安装 sing-box。
-2. 复制 `home-proxies.csv` 到 `/etc/our-singbox/home-proxies.csv`。
+2. 复制 `home-proxies.csv` 到 `/etc/reality-relay-bootstrap/home-proxies.csv`。
 3. 生成 VLESS UUID、Reality keypair、short-id。
 4. 生成 `/etc/sing-box/config.json`。
 5. 执行 `sing-box check`。
 6. 通过后重启 sing-box。
-7. 输出 `/root/our-singbox-nodes.txt` 和 `/root/our-singbox-clash.yaml`。
+7. 输出 `/root/reality-relay-bootstrap-nodes.txt` 和 `/root/reality-relay-bootstrap-clash.yaml`。
 
 ## 5. 防火墙
 

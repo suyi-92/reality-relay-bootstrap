@@ -2,7 +2,7 @@
 # 回滚 SSH 加固和 sing-box 配置；UFW 可选禁用或恢复。
 set -Eeuo pipefail
 PHASE_NAME="rollback"
-source "${OBS_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}/scripts/00-lib.sh"
+source "${RRB_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}/scripts/00-lib.sh"
 require_root
 load_config
 
@@ -64,8 +64,8 @@ backup_path /etc/sing-box/config.json || true
 backup_path /etc/ufw || true
 
 info "移除本项目 SSH 加固 drop-in。"
-remove_file_safe /etc/ssh/sshd_config.d/00-our-server-bootstrap-hardening.conf
-remove_file_safe /etc/ssh/sshd_config.d/00-our-server-bootstrap-phase1.conf
+remove_file_safe /etc/ssh/sshd_config.d/00-reality-relay-bootstrap-hardening.conf
+remove_file_safe /etc/ssh/sshd_config.d/00-reality-relay-bootstrap-phase1.conf
 
 if is_dry_run; then
   log "DRY-RUN: remove managed SFTP Match block from /etc/ssh/sshd_config"
@@ -78,8 +78,8 @@ from pathlib import Path
 user = sys.argv[1]
 path = Path("/etc/ssh/sshd_config")
 if path.exists():
-    start = f"# BEGIN our-server-bootstrap SFTP user {user}"
-    end = f"# END our-server-bootstrap SFTP user {user}"
+    start = f"# BEGIN reality-relay-bootstrap SFTP user {user}"
+    end = f"# END reality-relay-bootstrap SFTP user {user}"
     text = path.read_text(encoding="utf-8", errors="replace")
     text = re.sub(re.escape(start) + r".*?" + re.escape(end) + r"\n?", "", text, flags=re.S)
     path.write_text(text, encoding="utf-8")
@@ -145,6 +145,7 @@ cat <<EOF
 可选环境变量：
   RESTORE_FULL_SSH_BACKUP=yes      恢复完整 SSH 备份
   RESTORE_UFW_FROM_BACKUP=yes      恢复 /etc/ufw 备份
+  ROLLBACK_BACKUP_DIR=/path        指定要恢复的备份目录
   ROLLBACK_DISABLE_UFW=yes         回滚时直接禁用 UFW
   RESTORE_233BOY_CONF=yes          恢复 233boy 默认 conf 目录
 EOF

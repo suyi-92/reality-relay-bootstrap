@@ -2,7 +2,7 @@
 # 安装 UFW，并先放行当前 SSH 端口。不要在这里删除任何旧规则。
 set -Eeuo pipefail
 PHASE_NAME="ufw"
-source "${OBS_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}/scripts/00-lib.sh"
+source "${RRB_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}/scripts/00-lib.sh"
 require_root
 load_config
 require_supported_os
@@ -15,5 +15,5 @@ fi
 backup_path /etc/ufw || true
 apt_install ufw
 
-run ufw allow "${SSH_PORT}/tcp" comment "our-server-bootstrap SSH current port"
+run ufw allow "${SSH_PORT}/tcp" comment "reality-relay-bootstrap SSH current port"
 info "已先放行当前 SSH 端口 $SSH_PORT/tcp。启用 UFW 后必须另开窗口测试 SSH。"

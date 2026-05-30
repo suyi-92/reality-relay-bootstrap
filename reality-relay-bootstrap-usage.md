@@ -39,12 +39,13 @@ rollback       -> 回滚 SSH 加固、sing-box 配置，可选处理 UFW
 ```text
 config.env
 home-proxies.csv
-/etc/our-singbox/vless-uuid.txt
-/etc/our-singbox/reality-private.key
-/etc/our-singbox/reality-public.key
-/etc/our-singbox/reality-short-id.txt
-/root/our-singbox-nodes.txt
-/root/our-singbox-clash.yaml
+/etc/reality-relay-bootstrap/vless-uuid.txt
+/etc/reality-relay-bootstrap/reality-private.key
+/etc/reality-relay-bootstrap/reality-public.key
+/etc/reality-relay-bootstrap/reality-short-id.txt
+/etc/reality-relay-bootstrap/home-proxies.csv
+/root/reality-relay-bootstrap-nodes.txt
+/root/reality-relay-bootstrap-clash.yaml
 ```
 
 ---
@@ -173,15 +174,15 @@ ENABLE_IPV6_LISTEN="false"
 ADMIN_SUDO_NOPASSWD="true"
 SFTP_PUBKEY=""
 CSV_PATH="./home-proxies.csv"
-OUR_STATE_DIR="/etc/our-singbox"
+RRB_STATE_DIR="/etc/reality-relay-bootstrap"
 SINGBOX_CONFIG_PATH="/etc/sing-box/config.json"
 
 PROXY_PROTOCOL="vless-reality"
-VLESS_UUID_PATH="/etc/our-singbox/vless-uuid.txt"
+VLESS_UUID_PATH="/etc/reality-relay-bootstrap/vless-uuid.txt"
 VLESS_FLOW="xtls-rprx-vision"
-REALITY_PRIVATE_KEY_PATH="/etc/our-singbox/reality-private.key"
-REALITY_PUBLIC_KEY_PATH="/etc/our-singbox/reality-public.key"
-REALITY_SHORT_ID_PATH="/etc/our-singbox/reality-short-id.txt"
+REALITY_PRIVATE_KEY_PATH="/etc/reality-relay-bootstrap/reality-private.key"
+REALITY_PUBLIC_KEY_PATH="/etc/reality-relay-bootstrap/reality-public.key"
+REALITY_SHORT_ID_PATH="/etc/reality-relay-bootstrap/reality-short-id.txt"
 REALITY_SERVER_NAME="www.microsoft.com"
 REALITY_HANDSHAKE_SERVER="www.microsoft.com"
 REALITY_HANDSHAKE_PORT="443"
@@ -200,15 +201,17 @@ CLASH_MIXED_PORT="7890"
 
 | 变量 | 说明 | 示例 |
 |---|---|---|
-| `SERVER_ALIAS` | 服务器别名，只用于文档/输出识别 | `my-vps` |
+| `SERVER_ALIAS` | 服务器别名；会作为 443/direct 或 443/smart 节点名称 | `my-vps` |
 | `SERVER_IP` | 服务器公网 IP，建议必填 | `1.2.3.4` |
 | `SSH_PORT` | 当前 SSH 端口 | `22` |
-| `INITIAL_USER` | 服务商初始用户 | `root` |
+| `INITIAL_USER` | 服务商初始用户；当前仅作为预留/记录字段，实际 SSH 登录仍由你手动完成 | `root` |
 | `ADMIN_USER` | 新建管理用户 | `admin` |
 | `ADMIN_PUBKEY` | 本地 SSH 公钥 | `ssh-ed25519 AAAA...` |
 | `ADMIN_SUDO_NOPASSWD` | admin 是否免密 sudo | `true` |
 
 建议明确填写 `ADMIN_PUBKEY`。如果留空，脚本会尝试复制 `/root/.ssh/authorized_keys` 给 admin，但这依赖 root 当前已有正确公钥。
+
+`INITIAL_USER` 当前不会被脚本用来发起 SSH 登录或切换用户；它只是记录你服务商初始登录用户，真正的第一次登录仍需要你手动完成。
 
 ### 5.2 SFTP-only 用户变量
 
@@ -280,10 +283,10 @@ DIRECT_PORT="443"
 客户端 -> VPS:443 -> VPS 自身公网出口 -> 互联网
 ```
 
-生成的节点名通常是：
+生成的 443 节点名就是 `SERVER_ALIAS`。例如：
 
 ```text
-Relay-Direct-443
+my-vps
 ```
 
 #### 模式二：`MODE_443=smart`
@@ -333,13 +336,19 @@ HOME_PORT_END="51060"
 
 ### 5.6 VLESS+Reality 变量
 
+`RRB_STATE_DIR` 是默认状态目录，用来保存复制后的 `home-proxies.csv`、VLESS UUID、Reality keypair 和 short-id。除非你明确要迁移目录，否则建议保持默认：
+
+```bash
+RRB_STATE_DIR="/etc/reality-relay-bootstrap"
+```
+
 ```bash
 PROXY_PROTOCOL="vless-reality"
-VLESS_UUID_PATH="/etc/our-singbox/vless-uuid.txt"
+VLESS_UUID_PATH="/etc/reality-relay-bootstrap/vless-uuid.txt"
 VLESS_FLOW="xtls-rprx-vision"
-REALITY_PRIVATE_KEY_PATH="/etc/our-singbox/reality-private.key"
-REALITY_PUBLIC_KEY_PATH="/etc/our-singbox/reality-public.key"
-REALITY_SHORT_ID_PATH="/etc/our-singbox/reality-short-id.txt"
+REALITY_PRIVATE_KEY_PATH="/etc/reality-relay-bootstrap/reality-private.key"
+REALITY_PUBLIC_KEY_PATH="/etc/reality-relay-bootstrap/reality-public.key"
+REALITY_SHORT_ID_PATH="/etc/reality-relay-bootstrap/reality-short-id.txt"
 REALITY_SERVER_NAME="www.microsoft.com"
 REALITY_HANDSHAKE_SERVER="www.microsoft.com"
 REALITY_HANDSHAKE_PORT="443"
@@ -349,13 +358,15 @@ REALITY_MAX_TIME_DIFFERENCE="1m"
 首次执行 `singbox` 阶段时会自动生成：
 
 ```text
-/etc/our-singbox/vless-uuid.txt
-/etc/our-singbox/reality-private.key
-/etc/our-singbox/reality-public.key
-/etc/our-singbox/reality-short-id.txt
+/etc/reality-relay-bootstrap/vless-uuid.txt
+/etc/reality-relay-bootstrap/reality-private.key
+/etc/reality-relay-bootstrap/reality-public.key
+/etc/reality-relay-bootstrap/reality-short-id.txt
 ```
 
 你一般不需要手动改这些路径。
+
+因此 `/etc/reality-relay-bootstrap/home-proxies.csv` 也按敏感文件处理。
 
 `REALITY_SERVER_NAME` 和 `REALITY_HANDSHAKE_SERVER` 默认是：
 
@@ -430,7 +441,13 @@ sudo bash bootstrap.sh --phase firewall --dry-run
 
 `--dry-run` 会尽量打印将要执行的动作，不做实际修改。
 
-`--yes` 可以减少普通确认，但不能绕过危险步骤。以下危险步骤仍必须显式环境变量确认：
+也可以显式指定配置文件路径：
+
+```bash
+sudo bash bootstrap.sh --phase preflight --config /root/reality-relay-bootstrap/config.env
+```
+
+`--yes` 当前为预留参数；危险步骤仍必须使用 `CONFIRM_*` 环境变量显式确认：
 
 ```bash
 CONFIRM_ADMIN_KEY_LOGIN=yes
@@ -575,12 +592,13 @@ sudo bash bootstrap.sh --phase singbox
 
 ```text
 /etc/sing-box/config.json
-/etc/our-singbox/vless-uuid.txt
-/etc/our-singbox/reality-private.key
-/etc/our-singbox/reality-public.key
-/etc/our-singbox/reality-short-id.txt
-/root/our-singbox-nodes.txt
-/root/our-singbox-clash.yaml
+/etc/reality-relay-bootstrap/vless-uuid.txt
+/etc/reality-relay-bootstrap/reality-private.key
+/etc/reality-relay-bootstrap/reality-public.key
+/etc/reality-relay-bootstrap/reality-short-id.txt
+/etc/reality-relay-bootstrap/home-proxies.csv
+/root/reality-relay-bootstrap-nodes.txt
+/root/reality-relay-bootstrap-clash.yaml
 ```
 
 ### 8.7 配置 UFW 防火墙
@@ -648,8 +666,8 @@ sudo bash bootstrap.sh --phase output-nodes
 查看：
 
 ```bash
-sudo cat /root/our-singbox-nodes.txt
-sudo cat /root/our-singbox-clash.yaml
+sudo cat /root/reality-relay-bootstrap-nodes.txt
+sudo cat /root/reality-relay-bootstrap-clash.yaml
 ```
 
 ---
@@ -697,9 +715,9 @@ sudo bash bootstrap.sh --phase output-nodes
 节点示例：
 
 ```text
-Relay-Direct-443
-home-01-51043
-home-02-51044
+my-vps
+home-01
+home-02
 ```
 
 ### 10.2 smart 模式
@@ -719,22 +737,22 @@ home-02-51044
 节点示例：
 
 ```text
-Smart-443
-home-01-51043
-home-02-51044
+my-vps
+home-01
+home-02
 ```
 
 ---
 
 ## 11. 客户端节点信息
 
-`/root/our-singbox-clash.yaml` 会生成 Clash/Mihomo 可用配置。
+`/root/reality-relay-bootstrap-clash.yaml` 会生成 Clash/Mihomo 可用配置。
 
 节点字段示例：
 
 ```yaml
 proxies:
-  - name: "home-01-51043"
+  - name: "home-01"
     type: vless
     server: "1.2.3.4"
     port: 51043
@@ -752,7 +770,7 @@ proxies:
       - "http/1.1"
 ```
 
-`/root/our-singbox-nodes.txt` 是纯文本字段，便于你复制到其他客户端或订阅管理工具。
+`/root/reality-relay-bootstrap-nodes.txt` 是纯文本字段，便于你复制到其他客户端或订阅管理工具。
 
 注意：这两个文件包含 UUID 和 Reality public key/short-id。虽然 public key 不像 private key 那么敏感，但完整节点仍应当当作敏感信息处理。
 
@@ -806,7 +824,7 @@ ssh -p 22 -o PubkeyAuthentication=no -o PreferredAuthentications=password admin@
 把服务器上的文件复制到本地：
 
 ```bash
-sudo cat /root/our-singbox-clash.yaml
+sudo cat /root/reality-relay-bootstrap-clash.yaml
 ```
 
 复制内容到本地文件，例如：
@@ -834,9 +852,9 @@ curl.exe -x http://127.0.0.1:7890 https://ifconfig.me
 预期：
 
 ```text
-Relay-Direct-443 -> VPS 自身公网 IP
-home-01-51043   -> home-01 对应家宽出口 IP
-home-02-51044   -> home-02 对应家宽出口 IP
+my-vps  -> VPS 自身公网 IP
+home-01 -> home-01 对应家宽出口 IP
+home-02 -> home-02 对应家宽出口 IP
 ```
 
 ---
@@ -871,7 +889,7 @@ sudo bash bootstrap.sh --phase output-nodes
 TCP 51045
 ```
 
-最后把新的 `/root/our-singbox-clash.yaml` 导入客户端，或更新你的订阅管理工具。
+最后把新的 `/root/reality-relay-bootstrap-clash.yaml` 导入客户端，或更新你的订阅管理工具。
 
 ---
 
@@ -910,7 +928,7 @@ sudo ufw delete 编号
 ### 16.1 更换 UUID
 
 ```bash
-sudo rm -f /etc/our-singbox/vless-uuid.txt
+sudo rm -f /etc/reality-relay-bootstrap/vless-uuid.txt
 sudo bash bootstrap.sh --phase singbox
 sudo bash bootstrap.sh --phase output-nodes
 ```
@@ -918,9 +936,9 @@ sudo bash bootstrap.sh --phase output-nodes
 ### 16.2 更换 Reality keypair 和 short-id
 
 ```bash
-sudo rm -f /etc/our-singbox/reality-private.key
-sudo rm -f /etc/our-singbox/reality-public.key
-sudo rm -f /etc/our-singbox/reality-short-id.txt
+sudo rm -f /etc/reality-relay-bootstrap/reality-private.key
+sudo rm -f /etc/reality-relay-bootstrap/reality-public.key
+sudo rm -f /etc/reality-relay-bootstrap/reality-short-id.txt
 sudo bash bootstrap.sh --phase singbox
 sudo bash bootstrap.sh --phase output-nodes
 ```
@@ -928,7 +946,7 @@ sudo bash bootstrap.sh --phase output-nodes
 更换后必须重新导入：
 
 ```text
-/root/our-singbox-clash.yaml
+/root/reality-relay-bootstrap-clash.yaml
 ```
 
 ---
@@ -943,9 +961,9 @@ sudo CONFIRM_ROLLBACK=yes bash bootstrap.sh --phase rollback
 
 默认会处理：
 
-- 移除 SSH hardening drop-in。
+- 移除本项目管理的 SSH hardening / phase1 drop-in。
 - 回滚 sing-box 配置到最近备份。
-- 尽量恢复被隔离的 233boy conf。
+- 默认不恢复 UFW，也不恢复被隔离的 233boy conf；这两个动作需要显式环境变量确认。
 
 ### 17.2 恢复完整 SSH 主配置备份
 
@@ -967,7 +985,23 @@ sudo CONFIRM_ROLLBACK=yes ROLLBACK_DISABLE_UFW=yes bash bootstrap.sh --phase rol
 sudo ufw disable
 ```
 
-### 17.4 恢复 233boy conf
+### 17.4 指定备份目录回滚
+
+默认 rollback 会使用 `/root/reality-relay-bootstrap-backups/` 下最新的备份目录。需要指定某个备份目录时：
+
+```bash
+sudo CONFIRM_ROLLBACK=yes ROLLBACK_BACKUP_DIR=/root/reality-relay-bootstrap-backups/backup-xxxx bash bootstrap.sh --phase rollback
+```
+
+### 17.5 从备份恢复 UFW 配置
+
+默认不会整目录恢复 `/etc/ufw`。确认要恢复备份中的 UFW 配置时：
+
+```bash
+sudo CONFIRM_ROLLBACK=yes RESTORE_UFW_FROM_BACKUP=yes bash bootstrap.sh --phase rollback
+```
+
+### 17.6 恢复 233boy conf
 
 ```bash
 sudo CONFIRM_ROLLBACK=yes RESTORE_233BOY_CONF=yes bash bootstrap.sh --phase rollback
@@ -1041,7 +1075,8 @@ sudo cat /home/admin/.ssh/authorized_keys
 不要关闭旧窗口。先临时移除加固 drop-in：
 
 ```bash
-sudo rm -f /etc/ssh/sshd_config.d/00-our-hardening.conf
+sudo rm -f /etc/ssh/sshd_config.d/00-reality-relay-bootstrap-hardening.conf
+sudo rm -f /etc/ssh/sshd_config.d/00-reality-relay-bootstrap-phase1.conf
 sudo /usr/sbin/sshd -t
 sudo systemctl reload ssh 2>/dev/null || sudo systemctl reload sshd
 ```
@@ -1128,9 +1163,9 @@ curl --proxy http://家宽地址:端口 --proxy-user '用户名:密码' https://
 检查你选择的节点端口是否正确：
 
 ```text
-Relay-Direct-443 -> VPS 自身出口
-home-01-51043   -> home-01 家宽出口
-home-02-51044   -> home-02 家宽出口
+my-vps  -> VPS 自身出口
+home-01 -> home-01 家宽出口
+home-02 -> home-02 家宽出口
 ```
 
 检查生成配置：
@@ -1185,9 +1220,9 @@ sudo bash bootstrap.sh --phase validate
 [ ] 服务商安全组放行 SSH_PORT、DIRECT_PORT、CSV 端口
 [ ] Test-NetConnection 443 成功
 [ ] Test-NetConnection 51043 成功
-[ ] /root/our-singbox-clash.yaml 已生成
+[ ] /root/reality-relay-bootstrap-clash.yaml 已生成
 [ ] 客户端导入节点后能连接
-[ ] Relay-Direct-443 出口是 VPS 自身公网 IP
+[ ] SERVER_ALIAS 对应的 443 节点出口是 VPS 自身公网 IP
 [ ] 每个家宽节点出口 IP 符合预期
 ```
 
@@ -1199,7 +1234,7 @@ sudo bash bootstrap.sh --phase validate
 
 ```bash
 cd /root
-unzip reality-relay-bootstrap-vless-reality.zip
+unzip reality-relay-bootstrap.zip
 cd reality-relay-bootstrap
 
 cp config.example.env config.env

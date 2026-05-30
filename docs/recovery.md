@@ -46,3 +46,21 @@ sudo ufw disable
 ```bash
 sudo CONFIRM_ROLLBACK=yes RESTORE_233BOY_CONF=yes bash bootstrap.sh --phase rollback
 ```
+
+
+## 指定备份目录
+
+默认使用最近一次备份。如需指定备份目录：
+
+```bash
+sudo CONFIRM_ROLLBACK=yes ROLLBACK_BACKUP_DIR=/root/reality-relay-bootstrap-backups/backup-xxxx bash bootstrap.sh --phase rollback
+```
+
+
+## 从备份恢复 UFW 配置
+
+确认要整目录恢复 `/etc/ufw` 时：
+
+```bash
+sudo CONFIRM_ROLLBACK=yes RESTORE_UFW_FROM_BACKUP=yes bash bootstrap.sh --phase rollback
+```

@@ -2,7 +2,7 @@
 # 安装 sing-box，准备 VLESS UUID、Reality keypair、short-id、CSV 和备份。
 set -Eeuo pipefail
 PHASE_NAME="singbox-install"
-source "${OBS_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}/scripts/00-lib.sh"
+source "${RRB_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}/scripts/00-lib.sh"
 require_root
 load_config
 require_supported_os
@@ -11,30 +11,41 @@ apt_install ca-certificates curl gnupg openssl python3 iproute2
 
 backup_path /etc/sing-box/config.json || true
 [[ -d /etc/sing-box/conf ]] && backup_path /etc/sing-box/conf || true
-backup_path "$OUR_STATE_DIR" || true
+backup_path "$RRB_STATE_DIR" || true
 
 if port_in_use_by_other "$DIRECT_PORT"; then
   die "DIRECT_PORT=$DIRECT_PORT 已被非 sing-box 进程占用。请停止 nginx/apache/其他服务或修改 DIRECT_PORT。"
 fi
 
-if is_dry_run; then
-  log "DRY-RUN: mkdir -p $OUR_STATE_DIR /etc/sing-box && chmod 700 $OUR_STATE_DIR"
-else
-  mkdir -p "$OUR_STATE_DIR" /etc/sing-box
-  chmod 700 "$OUR_STATE_DIR"
-fi
+ensure_state_dirs() {
+  local path
+  if is_dry_run; then
+    log "DRY-RUN: mkdir -p $RRB_STATE_DIR /etc/sing-box and secret-file parent directories"
+  else
+    mkdir -p "$RRB_STATE_DIR" /etc/sing-box
+    for path in "$VLESS_UUID_PATH" "$REALITY_PRIVATE_KEY_PATH" "$REALITY_PUBLIC_KEY_PATH" "$REALITY_SHORT_ID_PATH"; do
+      mkdir -p "$(dirname "$path")"
+    done
+    chmod 700 "$RRB_STATE_DIR"
+  fi
+}
 
+ensure_state_dirs
+
+STATE_CSV="$RRB_STATE_DIR/home-proxies.csv"
 if [[ -f "$CSV_PATH" ]]; then
   if is_dry_run; then
-    log "DRY-RUN: install -m 600 $CSV_PATH $OUR_STATE_DIR/home-proxies.csv"
+    log "DRY-RUN: install -m 600 $CSV_PATH $STATE_CSV"
   else
-    install -m 600 -o root -g root "$CSV_PATH" "$OUR_STATE_DIR/home-proxies.csv"
+    install -m 600 -o root -g root "$CSV_PATH" "$STATE_CSV"
   fi
+elif [[ -f "$STATE_CSV" ]]; then
+  info "CSV_PATH 不存在，继续使用已保存的家宽 CSV：$STATE_CSV"
 else
-  die "找不到家宽 CSV：$CSV_PATH"
+  die "找不到家宽 CSV：$CSV_PATH，也找不到 $STATE_CSV"
 fi
 
-python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --config-env "$OBS_CONFIG_FILE" --check-only
+python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --config-env "$RRB_CONFIG_FILE" --check-only
 
 install_by_apt() {
   info "使用 sing-box 官方 APT 源安装。"
@@ -64,10 +75,10 @@ install_by_233boy() {
     log "DRY-RUN: download and run 233boy install.sh, then disable /etc/sing-box/conf"
     return 0
   fi
-  mkdir -p /root/our-server-bootstrap-cache
-  curl -fsSL https://github.com/233boy/sing-box/raw/main/install.sh -o /root/our-server-bootstrap-cache/233boy-install.sh
-  chmod 700 /root/our-server-bootstrap-cache/233boy-install.sh
-  bash /root/our-server-bootstrap-cache/233boy-install.sh
+  mkdir -p /root/reality-relay-bootstrap-cache
+  curl -fsSL https://github.com/233boy/sing-box/raw/main/install.sh -o /root/reality-relay-bootstrap-cache/233boy-install.sh
+  chmod 700 /root/reality-relay-bootstrap-cache/233boy-install.sh
+  bash /root/reality-relay-bootstrap-cache/233boy-install.sh
   local stamp
   stamp="$(date '+%Y%m%d-%H%M%S')"
   if [[ -d /etc/sing-box/conf ]]; then
@@ -148,6 +159,6 @@ sing-box 安装和 VLESS+Reality 密钥材料准备完成。下一步 bootstrap 
   1. 生成 /etc/sing-box/config.json
   2. 执行 sing-box check
   3. 通过后 restart sing-box
-  4. 生成 /root/our-singbox-nodes.txt 和 /root/our-singbox-clash.yaml
+  4. 生成 /root/reality-relay-bootstrap-nodes.txt 和 /root/reality-relay-bootstrap-clash.yaml
 
 EOF
