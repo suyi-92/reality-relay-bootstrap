@@ -1,4 +1,4 @@
-# our-server-bootstrap VLESS+Reality 版
+# Reality Relay Bootstrap
 
 这是一套面向全新 Ubuntu/Debian VPS 的可复现部署脚本，目标是把 **SSH 安全初始化 + fail2ban + UFW + sing-box VLESS+Reality 多入口/多出口 + 客户端节点生成 + 回滚验证** 做成分阶段执行的项目，而不是一次性把服务器改到不可恢复状态。
 
