@@ -14,7 +14,7 @@
 每个节点类似：
 
 ```yaml
-name: home-01-51043
+name: home-01
 type: vless
 server: 服务器IP
 port: 51043
@@ -34,12 +34,12 @@ alpn:
 
 443 节点：
 
-- `MODE_443=direct`：`Relay-Direct-443`
-- `MODE_443=smart`：`Smart-443`
+- `MODE_443=direct`：使用 `SERVER_ALIAS`
+- `MODE_443=smart`：使用 `SERVER_ALIAS`
 
 CSV 行节点：
 
-- `home-01,51043,...` -> `home-01-51043`
+- `home-01,51043,...` -> `home-01`
 
 ## Windows PowerShell 测端口
 
@@ -58,8 +58,8 @@ curl.exe -x http://127.0.0.1:7890 https://ifconfig.me
 
 切换不同节点，出口 IP 应该对应：
 
-- `Relay-Direct-443`：中转机自身公网 IP
-- `home-xx-端口`：对应家宽代理出口 IP
+- `SERVER_ALIAS` 对应的节点（例如 `my-vps`）：中转机自身公网 IP
+- 家宽 `tag` 对应的节点（例如 `home-xx`）：对应家宽代理出口 IP
 
 ## 常见问题
 

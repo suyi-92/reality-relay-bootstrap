@@ -226,13 +226,13 @@ sudo cat /root/our-singbox-clash.yaml
 
 输出节点包括：
 
-- `Relay-Direct-443` 或 `Smart-443`
-- 每个 CSV 行一个节点，例如 `home-01-51043`
+- 443 节点使用 `SERVER_ALIAS`，例如 `my-vps`
+- 每个 CSV 行一个节点，直接使用该行 `tag`，例如 `home-01`
 
 Mihomo/Clash 节点字段为：
 
 ```yaml
-name: home-01-51043
+name: home-01
 type: vless
 server: 服务器IP
 port: 51043

@@ -205,6 +205,8 @@ def validate_env(env: Dict[str, str]) -> None:
         raise ConfigError("PROXY_PROTOCOL 当前只支持 vless-reality")
     if env["MODE_443"] not in {"direct", "smart"}:
         raise ConfigError("MODE_443 只能是 direct 或 smart")
+    if not env["SERVER_ALIAS"].strip():
+        raise ConfigError("SERVER_ALIAS 不能为空；它会作为 443 节点名称")
     if env["INSTALL_SINGBOX_METHOD"] not in {"apt", "233boy"}:
         raise ConfigError("INSTALL_SINGBOX_METHOD 只能是 apt 或 233boy")
     if env.get("VLESS_FLOW", "") not in {"", "xtls-rprx-vision"}:
@@ -542,12 +544,12 @@ def port_list(env: Dict[str, str], rows: List[Dict[str, Any]]) -> List[int]:
 
 def node_list(env: Dict[str, str], rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     direct_port = as_port(env, "DIRECT_PORT")
-    direct_name = "Relay-Direct-443" if env["MODE_443"] == "direct" else "Smart-443"
+    direct_name = env["SERVER_ALIAS"]
     nodes = [{"name": direct_name, "port": direct_port, "kind": env["MODE_443"]}]
     for row in rows:
         nodes.append(
             {
-                "name": f"{row['tag']}-{row['listen_port']}",
+                "name": row["tag"],
                 "port": row["listen_port"],
                 "kind": "home",
                 "home_tag": row["tag"],
