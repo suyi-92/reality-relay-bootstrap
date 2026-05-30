@@ -97,12 +97,18 @@ if [[ "$ENABLE_SFTP_USER" == "true" ]]; then
   fi
 fi
 
+if [[ "$ENABLE_SFTP_USER" == "true" ]]; then
+  sftp_status="true ($SFTP_USER)"
+else
+  sftp_status="false"
+fi
+
 cat <<EOF
 
 用户准备完成：
   管理用户：$ADMIN_USER
   sudo NOPASSWD：$ADMIN_SUDO_NOPASSWD
-  SFTP 用户：$ENABLE_SFTP_USER${ENABLE_SFTP_USER:+ ($SFTP_USER)}
+  SFTP 用户：$sftp_status
 
 下一步会写入 phase1 SSH drop-in，只开启公钥登录，不禁 root/密码。
 EOF
