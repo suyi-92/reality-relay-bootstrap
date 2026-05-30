@@ -1,0 +1,6 @@
+config.env
+home-proxies.csv
+*.log
+*.bak
+our-singbox-nodes.txt
+our-singbox-clash.yaml

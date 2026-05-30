@@ -1,0 +1,3 @@
+tag,listen_port,type,server,server_port,username,password,network
+# home-01,51043,socks5,proxy1.example.com,1080,user1,"pass,with,comma",tcp
+# home-02,51044,http,proxy2.example.com,8080,user2,password2,tcp
