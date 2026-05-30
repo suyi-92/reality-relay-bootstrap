@@ -38,10 +38,9 @@ create_user_if_needed() {
 install_authorized_keys() {
   local user="$1" key_text="$2"
   local home
-  home="$(getent passwd "$user" | cut -d: -f6)"
-  [[ -n "$home" ]] || die "无法获取 $user 的 home"
+  home="$(user_home "$user")"
   if is_dry_run; then
-    log "DRY-RUN: install authorized_keys for $user"
+    log "DRY-RUN: install authorized_keys for $user at $home/.ssh/authorized_keys"
     return 0
   fi
   install -d -m 700 -o "$user" -g "$user" "$home/.ssh"

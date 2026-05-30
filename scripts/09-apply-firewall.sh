@@ -12,7 +12,7 @@ if [[ "$ENABLE_UFW" != "true" ]]; then
   exit 0
 fi
 
-"$SCRIPT_DIR/06-install-ufw.sh"
+bash "$SCRIPT_DIR/06-install-ufw.sh"
 
 mapfile -t PORTS < <(python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --config-env "$OBS_CONFIG_FILE" --print-ports)
 [[ "${#PORTS[@]}" -ge 1 ]] || die "未解析到 VLESS+Reality 端口。"

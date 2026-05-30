@@ -39,6 +39,25 @@ run() {
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
+user_home() {
+  local user="$1" entry home
+  entry="$(getent passwd "$user" || true)"
+  if [[ -n "$entry" ]]; then
+    home="${entry#*:*:*:*:*:}"
+    home="${home%%:*}"
+    [[ -n "$home" ]] || die "无法获取 $user 的 home"
+    printf '%s\n' "$home"
+    return 0
+  fi
+
+  if is_dry_run; then
+    printf '/home/%s\n' "$user"
+    return 0
+  fi
+
+  die "用户不存在，无法获取 home：$user"
+}
+
 apt_install() {
   require_root
   export DEBIAN_FRONTEND=noninteractive
