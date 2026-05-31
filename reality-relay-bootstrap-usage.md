@@ -1,7 +1,7 @@
 # reality-relay-bootstrap 完整使用手册
 
-> 适用项目：`reality-relay-bootstrap`  
-> 目标系统：Ubuntu 22.04 / Ubuntu 24.04 / Debian 13  
+> 适用项目：`reality-relay-bootstrap` 
+> 目标系统：Ubuntu 22.04 / Ubuntu 24.04 / Debian 13 
 > 核心目标：新 VPS 可复现部署、SSH 不锁机、fail2ban、UFW、sing-box VLESS+Reality 多入口多出口、客户端节点生成、验证与回滚。
 
 ---
@@ -149,6 +149,13 @@ cat home-proxies.csv
 ---
 
 ## 5. `config.env` 完整说明
+
+复制模板文件并打开编辑：
+
+~~~bash
+cp config.example.env config.env
+nano config.env
+~~~
 
 下面是典型配置示例：
 
@@ -387,9 +394,30 @@ CLASH_MIXED_PORT="7890"
 
 默认关闭 UDP，更稳。HTTP 家宽代理通常不适合 UDP，SOCKS5 也不一定支持 UDP。建议先 TCP 跑通后，再考虑是否开启 UDP。
 
+### 5.8 保存关闭并检查
+
+```bash
+ctrl + o
+enter
+ctrl + x
+```
+
+检查是否编辑正确：
+
+~~~bash
+cat config.env
+~~~
+
 ---
 
 ## 6. `home-proxies.csv` 完整说明
+
+复制模板文件并打开编辑：
+
+~~~bash
+cp home-proxies.example.env home-proxies.csv
+nano home-proxies.csv
+~~~
 
 CSV 示例：
 
@@ -425,6 +453,20 @@ home-01,51043,socks5,proxy.example.com,1080,user,"abc,123",tcp
 ```
 
 6. CSV 里有家宽代理账号密码，不要公开、不要提交到 GitHub。
+
+### 6.1 保存关闭并检查
+
+```bash
+ctrl + o
+enter
+ctrl + x
+```
+
+检查是否编辑正确：
+
+~~~bash
+cat home-proxies.csv
+~~~
 
 ---
 
