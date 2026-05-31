@@ -64,7 +64,7 @@ bash <(wget -qO- https://raw.githubusercontent.com/suyi-92/reality-relay-bootstr
 sudo bash install.sh
 ```
 
-一键脚本仍然保留 SSH 二阶段安全确认：完成 `ssh-phase1` 后，需要你另开窗口确认 admin 公钥登录和 `sudo` 正常，才会继续执行 `ssh-final`。
+一键脚本仍然保留 SSH 二阶段安全确认：完成 `ssh-phase1` 后，需要你另开窗口确认 admin 公钥登录和 `sudo` 正常，才会继续执行 `ssh-final`。家宽代理既可以按提示逐个填写，也可以选择一次性粘贴多行 CSV；字段顺序与 `home-proxies.csv` 相同，支持带表头，粘贴后输入空行结束。
 
 ## 第一次使用
 
@@ -80,6 +80,8 @@ nano config.env
 cp home-proxies.example.csv home-proxies.csv
 nano home-proxies.csv
 ```
+
+`home-proxies.csv` 的字段顺序为 `tag,listen_port,type,server,server_port,username,password,network`。分步骤配置时可以直接编辑这个 CSV；一键安装时也可以把同样格式的多行 CSV 一次性粘贴进去。
 
 先 dry-run：
 

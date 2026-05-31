@@ -45,7 +45,7 @@ else
   die "找不到家宽 CSV：$CSV_PATH，也找不到 $STATE_CSV"
 fi
 
-python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --config-env "$RRB_CONFIG_FILE" --check-only
+python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --config-env "$RRB_CONFIG_FILE" --check-only --quiet
 
 install_by_apt() {
   info "使用 sing-box 官方 APT 源安装。"
@@ -64,8 +64,8 @@ Components: *
 Enabled: yes
 Signed-By: /etc/apt/keyrings/sagernet.asc
 APT
-  apt-get update -y 2>&1 | tee -a "$LOG_FILE"
-  apt-get install -y sing-box 2>&1 | tee -a "$LOG_FILE"
+  apt-get update -y >>"$LOG_FILE" 2>&1
+  apt-get install -y sing-box >>"$LOG_FILE" 2>&1
 }
 
 install_by_233boy() {
@@ -103,7 +103,8 @@ if [[ -z "$bin" ]]; then
     die "sing-box 安装后仍找不到可执行文件。"
   fi
 else
-  "$bin" version 2>&1 | tee -a "$LOG_FILE" || true
+  "$bin" version >>"$LOG_FILE" 2>&1 || true
+  info "sing-box 可执行文件已就绪：$bin"
 fi
 
 if [[ ! -s "$VLESS_UUID_PATH" ]]; then
@@ -153,12 +154,4 @@ else
   chmod 600 "$REALITY_SHORT_ID_PATH" || true
 fi
 
-cat <<EOF
-
-sing-box 安装和 VLESS+Reality 密钥材料准备完成。下一步 bootstrap 的 singbox 阶段会：
-  1. 生成 /etc/sing-box/config.json
-  2. 执行 sing-box check
-  3. 通过后 restart sing-box
-  4. 生成 /root/reality-relay-bootstrap-nodes.txt 和 /root/reality-relay-bootstrap-clash.yaml
-
-EOF
+info "sing-box 安装和 VLESS+Reality 密钥材料准备完成。"

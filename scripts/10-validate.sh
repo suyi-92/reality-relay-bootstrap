@@ -34,8 +34,8 @@ if [[ "$SINGBOX_ONLY" != "true" ]]; then
     info "检查 fail2ban。"
     if ! is_dry_run; then
       fail2ban-client -t 2>&1 | tee -a "$LOG_FILE"
-      systemctl status fail2ban --no-pager 2>&1 | tee -a "$LOG_FILE" || die "fail2ban 未运行"
-      fail2ban-client status 2>&1 | tee -a "$LOG_FILE" || true
+      systemctl is-active --quiet fail2ban || die "fail2ban 未运行"
+      info "fail2ban 服务运行中。"
       fail2ban-client status sshd 2>&1 | tee -a "$LOG_FILE" || true
     fi
   fi
@@ -44,13 +44,12 @@ if [[ "$SINGBOX_ONLY" != "true" ]]; then
     info "检查 UFW。"
     if ! is_dry_run; then
       ufw status verbose 2>&1 | tee -a "$LOG_FILE"
-      ufw status numbered 2>&1 | tee -a "$LOG_FILE"
     fi
   fi
 fi
 
 info "检查 sing-box 配置语法。"
-python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --config-env "$RRB_CONFIG_FILE" --check-only
+python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --config-env "$RRB_CONFIG_FILE" --check-only --quiet
 singbox_check "$SINGBOX_CONFIG_PATH"
 
 if [[ "$RESTART_SINGBOX" == "true" ]]; then
@@ -66,7 +65,8 @@ if is_dry_run; then
   info "DRY-RUN: 跳过 sing-box systemd 状态、监听端口和家宽代理实测。"
 else
   info "检查 sing-box systemd 状态。"
-  systemctl status sing-box --no-pager 2>&1 | tee -a "$LOG_FILE" || die "sing-box systemd 状态异常"
+  systemctl is-active --quiet sing-box || die "sing-box 未运行"
+  info "sing-box 服务运行中。"
 fi
 
 mapfile -t PORTS < <(python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --config-env "$RRB_CONFIG_FILE" --print-ports)
@@ -76,7 +76,6 @@ else
   info "检查监听端口：${PORTS[*]}"
 fi
 if ! is_dry_run; then
-  ss -lntp 2>&1 | tee -a "$LOG_FILE" | grep -E 'sing-box|State|LISTEN' >/dev/null || true
   for port in "${PORTS[@]}"; do
     if ss -H -ltn 2>/dev/null | awk '{print $4}' | grep -Eq "(:|\\])${port}$"; then
       info "端口监听正常：$port"

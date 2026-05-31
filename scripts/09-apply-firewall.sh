@@ -30,7 +30,6 @@ if is_dry_run; then
 else
   ufw --force enable 2>&1 | tee -a "$LOG_FILE"
   ufw status verbose 2>&1 | tee -a "$LOG_FILE"
-  ufw status numbered 2>&1 | tee -a "$LOG_FILE"
 fi
 
 cat <<EOF

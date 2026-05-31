@@ -31,7 +31,7 @@ if port_in_use_by_other "$DIRECT_PORT"; then
   die "DIRECT_PORT=$DIRECT_PORT 已被非 sing-box 进程占用。请停止占用服务或修改端口。"
 fi
 
-python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --config-env "$RRB_CONFIG_FILE" --check-only
+python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --config-env "$RRB_CONFIG_FILE" --check-only --quiet
 
 cat <<EOF
 

@@ -598,6 +598,7 @@ def main() -> int:
     ap.add_argument("--print-ports", action="store_true")
     ap.add_argument("--print-nodes-json", action="store_true")
     ap.add_argument("--summary", action="store_true")
+    ap.add_argument("--quiet", action="store_true", help="only validate/write without printing the human summary")
     args = ap.parse_args()
 
     env_path = Path(args.config_env).resolve()
@@ -616,7 +617,8 @@ def main() -> int:
         return 0
 
     if args.check_only:
-        print_summary(env, rows)
+        if not args.quiet:
+            print_summary(env, rows)
         return 0
 
     if args.summary:
@@ -639,8 +641,9 @@ def main() -> int:
         os.chmod(tmp, 0o600)
         tmp.replace(config_path)
         os.chmod(config_path, 0o600)
-        print(f"已生成 {config_path}")
-        print_summary(env, rows)
+        if not args.quiet:
+            print(f"已生成 {config_path}")
+            print_summary(env, rows)
         return 0
 
     ap.error("请指定 --check-only、--write、--print-ports、--print-nodes-json 或 --summary")

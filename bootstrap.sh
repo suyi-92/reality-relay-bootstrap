@@ -58,7 +58,7 @@ case "$PHASE" in
   fail2ban) run_phase 05-install-fail2ban.sh ;;
   singbox)
     run_phase 07-install-singbox.sh
-    python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --config-env "$RRB_CONFIG_FILE" --write
+    python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --config-env "$RRB_CONFIG_FILE" --write --quiet
     run_phase 10-validate.sh --singbox-only --skip-proxy-tests --restart-singbox
     run_phase 11-output-nodes-wrapper.sh
     ;;
