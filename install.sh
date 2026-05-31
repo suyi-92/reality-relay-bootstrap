@@ -37,7 +37,14 @@ info() { printf '%b\n' "${BLUE}INFO${RESET} $*" >&2; }
 warn() { printf '%b\n' "${YELLOW}WARN${RESET} $*" >&2; }
 die() { printf '%b\n' "${RED}ERROR${RESET} $*" >&2; exit 1; }
 
+clear_screen() {
+  if [[ -t 1 ]]; then
+    printf '\033[2J\033[H'
+  fi
+}
+
 banner() {
+  clear_screen
   printf '%b\n' "${CYAN}${BOLD}"
   cat <<'BANNER'
 ╭──────────────────────────────────────────────────────────╮
