@@ -18,6 +18,8 @@
 ```text
 reality-relay-bootstrap/
   README.md
+  reality-relay-bootstrap-usage.md
+  install.sh
   config.example.env
   home-proxies.example.csv
   bootstrap.sh
@@ -45,6 +47,24 @@ reality-relay-bootstrap/
     recovery.md
     client-setup.md
 ```
+
+## 完整手册与一键安装
+
+更详细的参数解释、Windows PowerShell 示例、回滚和客户端导入说明，请阅读 [`reality-relay-bootstrap-usage.md`](./reality-relay-bootstrap-usage.md)。
+
+如果是在全新 VPS 上使用推荐默认值部署，可以直接运行一键安装脚本。脚本会自动拉取/定位项目、生成 `config.env` 和 `home-proxies.csv`，只要求你填写 `SERVER_ALIAS`、`SERVER_IP`、`SSH_PORT`、`ADMIN_USER`、一个或多个 `ADMIN_PUBKEY` 以及家宽代理 CSV 内容，其余配置保持安全默认值：
+
+```bash
+bash <(wget -qO- https://raw.githubusercontent.com/suyi-92/reality-relay-bootstrap/main/install.sh)
+```
+
+如果已经下载了本仓库，也可以在项目目录运行：
+
+```bash
+sudo bash install.sh
+```
+
+一键脚本仍然保留 SSH 二阶段安全确认：完成 `ssh-phase1` 后，需要你另开窗口确认 admin 公钥登录和 `sudo` 正常，才会继续执行 `ssh-final`。
 
 ## 第一次使用
 
@@ -77,10 +97,13 @@ SERVER_IP="你的服务器公网IP"
 SSH_PORT="22"
 ADMIN_USER="admin"
 ADMIN_PUBKEY="ssh-ed25519 AAAA... 你的本地公钥"
+# 多个公钥可写成逐行内容，例如：
+# ADMIN_PUBKEY=$'ssh-ed25519 AAAA... user1\nssh-ed25519 BBBB... user2'
+# 或把额外公钥写入 ADMIN_PUBKEYS。
 MODE_443="direct"
 ```
 
-如果 root 已经有正确公钥，`ADMIN_PUBKEY` 可以留空，脚本会复制 `/root/.ssh/authorized_keys` 给 admin。但更推荐明确填写 `ADMIN_PUBKEY`。
+如果 root 已经有正确公钥，`ADMIN_PUBKEY` 可以留空，脚本会复制 `/root/.ssh/authorized_keys` 给 admin。分步骤运行时，`ADMIN_PUBKEY` 支持用 `$'key1\nkey2'` 写多个公钥，也可以把额外公钥逐行写入 `ADMIN_PUBKEYS`；一键脚本会逐条提示添加多个 `ADMIN_PUBKEY`。
 
 ## VLESS+Reality 参数
 

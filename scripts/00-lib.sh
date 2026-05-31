@@ -83,6 +83,16 @@ load_config() {
   : "${INITIAL_USER:=root}"
   : "${ADMIN_USER:=admin}"
   : "${ADMIN_PUBKEY:=}"
+  : "${ADMIN_PUBKEYS:=}"
+  if [[ -n "$ADMIN_PUBKEYS" ]]; then
+    if [[ -n "$ADMIN_PUBKEY" ]]; then
+      ADMIN_PUBKEY+=$'\n'
+      ADMIN_PUBKEY+="$ADMIN_PUBKEYS"
+    else
+      ADMIN_PUBKEY="$ADMIN_PUBKEYS"
+    fi
+  fi
+  export ADMIN_PUBKEY ADMIN_PUBKEYS
   : "${ENABLE_SFTP_USER:=false}"
   : "${SFTP_USER:=sftpuser}"
   : "${SFTP_PUBKEY:=}"
