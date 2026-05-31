@@ -74,14 +74,15 @@ sudo bash install.sh
 | `SSH_PORT` | `22` | 当前 SSH 端口 |
 | `ADMIN_USER` | `admin` | 新建管理用户 |
 | `ADMIN_PUBKEY` | `/root/.ssh/authorized_keys` 中已有公钥会逐条弹出，若存在 | 本地 SSH 公钥，可填写多个 |
-| `home-proxies.csv` | 逐条提示 `home-01`、`51043`、`socks5`、`1080`、`tcp` 等默认值 | 家宽出口列表 |
+| `home-proxies.csv` | 可逐条提示，也可一次性粘贴多行 CSV | 家宽出口列表；字段顺序同模板 |
 
 注意事项：
 
 1. 脚本会把远程一键模式的项目目录放在 `/opt/reality-relay-bootstrap`；可通过 `RRB_INSTALL_DIR=/path bash <(wget ...)` 覆盖。
 2. 写出的 `config.env` 和 `home-proxies.csv` 权限会设置为 `600`，不要公开。
-3. 执行到 `ssh-phase1` 后，脚本会停下来提示你另开窗口测试 admin key 登录；只有你确认成功后，才继续执行 `ssh-final`、fail2ban、sing-box、UFW、验证和节点输出。
-4. 如果只想生成配置、不自动跑部署阶段，可使用：
+3. 选择一次性粘贴家宽代理时，可以带 `tag,listen_port,type,server,server_port,username,password,network` 表头；粘贴完成后输入空行结束。
+4. 执行到 `ssh-phase1` 后，脚本会停下来提示你另开窗口测试 admin key 登录；只有你确认成功后，才继续执行 `ssh-final`、fail2ban、sing-box、UFW、验证和节点输出。
+5. 如果只想生成配置、不自动跑部署阶段，可使用：
 
 ```bash
 RRB_RUN_PHASES=false sudo bash install.sh
@@ -474,6 +475,8 @@ cat config.env
 cp home-proxies.example.csv home-proxies.csv
 nano home-proxies.csv
 ~~~
+
+分步骤模式直接编辑这个文件；一键安装模式可以选择逐条填写，或把同样格式的多行 CSV 一次性粘贴进去。
 
 CSV 示例：
 

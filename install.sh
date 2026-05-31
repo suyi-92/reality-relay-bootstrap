@@ -174,8 +174,9 @@ ensure_project() {
   info "当前是一键远程执行模式，将项目安装到：$INSTALL_DIR"
   if ! command -v git >/dev/null 2>&1; then
     info "安装 git/curl 基础依赖。"
-    apt-get update -y >&2
-    DEBIAN_FRONTEND=noninteractive apt-get install -y git curl ca-certificates >&2
+    local apt_log="/tmp/reality-relay-bootstrap-install-apt.log"
+    apt-get update -y >"$apt_log" 2>&1 || { tail -n 40 "$apt_log" >&2 || true; die "apt-get update 失败。"; }
+    DEBIAN_FRONTEND=noninteractive apt-get install -y git curl ca-certificates >>"$apt_log" 2>&1 || { tail -n 60 "$apt_log" >&2 || true; die "安装 git/curl 失败。"; }
   fi
 
   if [[ -d "$INSTALL_DIR/.git" ]]; then
@@ -250,12 +251,26 @@ write_home_proxies() {
   chmod 600 "$project_dir/home-proxies.csv"
 }
 
-collect_home_proxies() {
+collect_home_proxies_bulk() {
+  local rows_file="$1" line_value any=false
+  printf '%b\n' "${DIM}可直接粘贴多行 CSV，字段为：tag,listen_port,type,server,server_port,username,password,network${RESET}"
+  printf '%b\n' "${DIM}支持带表头；粘贴完成后输入空行结束。密码可留空，例如：home-01,51043,socks5,1.2.3.4,1080,,secret,tcp${RESET}"
+  while true; do
+    printf '%b' "> " >"$INPUT_TTY"
+    IFS= read -r line_value <"$INPUT_TTY" || true
+    [[ -n "$line_value" ]] || break
+    [[ "$line_value" =~ ^[[:space:]]*# ]] && continue
+    if [[ "$line_value" =~ ^[[:space:]]*tag[[:space:]]*,[[:space:]]*listen_port[[:space:]]*, ]]; then
+      continue
+    fi
+    printf '%s\n' "$line_value" >>"$rows_file"
+    any=true
+  done
+  [[ "$any" == "true" ]]
+}
+
+collect_home_proxies_one_by_one() {
   local rows_file="$1" index=1
-  : >"$rows_file"
-  line
-  printf '%b\n' "${CYAN}${BOLD}家宽代理配置${RESET}"
-  printf '%b\n' "${DIM}每一行会生成一个 VLESS+Reality 入口端口；如暂时没有家宽代理，可以不添加。${RESET}"
   while read_yes_no "是否添加第 ${index} 个家宽代理出口？" "$([[ $index -eq 1 ]] && echo yes || echo no)"; do
     local tag listen_port type server server_port username password network
     tag="$(read_default "  tag" "home-$(printf '%02d' "$index")")"
@@ -278,6 +293,20 @@ collect_home_proxies() {
       "$(csv_escape "$network")" >>"$rows_file"
     index=$((index + 1))
   done
+}
+
+collect_home_proxies() {
+  local rows_file="$1"
+  : >"$rows_file"
+  line
+  printf '%b\n' "${CYAN}${BOLD}家宽代理配置${RESET}"
+  printf '%b\n' "${DIM}每一行会生成一个 VLESS+Reality 入口端口；如暂时没有家宽代理，可以不添加。${RESET}"
+  if read_yes_no "是否一次性粘贴多行家宽代理 CSV？" no; then
+    collect_home_proxies_bulk "$rows_file" || warn "没有粘贴任何家宽代理行，将继续逐个输入。"
+  fi
+  if [[ ! -s "$rows_file" ]]; then
+    collect_home_proxies_one_by_one "$rows_file"
+  fi
 }
 
 run_install_flow() {
@@ -314,7 +343,6 @@ run_install_flow() {
   bash bootstrap.sh --phase singbox
   bash bootstrap.sh --phase firewall
   bash bootstrap.sh --phase validate
-  bash bootstrap.sh --phase output-nodes
 
   line
   printf '%b\n' "${GREEN}${BOLD}部署完成。节点文件：${RESET}"

@@ -65,8 +65,15 @@ apt_install() {
   if is_dry_run; then
     log "DRY-RUN: apt-get update && apt-get install -y $*"
   else
-    apt-get update -y 2>&1 | tee -a "$LOG_FILE"
-    apt-get install -y "$@" 2>&1 | tee -a "$LOG_FILE"
+    info "安装/确认依赖：$*"
+    if ! apt-get update -y >>"$LOG_FILE" 2>&1; then
+      tail -n 40 "$LOG_FILE" >&2 || true
+      die "apt-get update 失败；完整日志见 $LOG_FILE"
+    fi
+    if ! apt-get install -y "$@" >>"$LOG_FILE" 2>&1; then
+      tail -n 60 "$LOG_FILE" >&2 || true
+      die "apt-get install 失败：$*；完整日志见 $LOG_FILE"
+    fi
   fi
 }
 
@@ -274,8 +281,8 @@ reload_ssh() {
   if is_dry_run; then
     log "DRY-RUN: systemctl reload $svc || systemctl restart $svc"
   else
-    systemctl reload "$svc" 2>&1 | tee -a "$LOG_FILE" || systemctl restart "$svc" 2>&1 | tee -a "$LOG_FILE"
-    systemctl status "$svc" --no-pager 2>&1 | tee -a "$LOG_FILE" || true
+    systemctl reload "$svc" >>"$LOG_FILE" 2>&1 || systemctl restart "$svc" >>"$LOG_FILE" 2>&1
+    systemctl is-active --quiet "$svc" && info "SSH 服务已重载：$svc" || warn "无法确认 SSH 服务状态：$svc"
   fi
 }
 
@@ -339,9 +346,9 @@ restart_singbox() {
   if is_dry_run; then
     log "DRY-RUN: systemctl enable --now sing-box && systemctl restart sing-box"
   else
-    systemctl enable sing-box 2>&1 | tee -a "$LOG_FILE" || true
-    systemctl restart sing-box 2>&1 | tee -a "$LOG_FILE"
-    systemctl status sing-box --no-pager 2>&1 | tee -a "$LOG_FILE" || true
+    systemctl enable sing-box >>"$LOG_FILE" 2>&1 || true
+    systemctl restart sing-box >>"$LOG_FILE" 2>&1
+    systemctl is-active --quiet sing-box && info "sing-box 服务已启动。" || warn "无法确认 sing-box 服务状态。"
   fi
 }
 

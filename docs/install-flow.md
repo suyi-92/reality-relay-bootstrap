@@ -9,7 +9,7 @@ cp home-proxies.example.csv home-proxies.csv
 nano home-proxies.csv
 ```
 
-`443` 不写入 CSV。CSV 只管理 `51043` 起的家宽出口端口。
+`443` 不写入 CSV。CSV 只管理 `51043` 起的家宽出口端口。字段顺序为 `tag,listen_port,type,server,server_port,username,password,network`；分步骤模式直接编辑 `home-proxies.csv`，一键模式可选择逐个填写或一次性粘贴多行 CSV（可带表头，空行结束）。
 
 ## 2. SSH 初始化与加固
 
