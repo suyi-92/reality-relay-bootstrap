@@ -133,6 +133,7 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
         "INITIAL_USER": "root",
         "ADMIN_USER": "admin",
         "ADMIN_PUBKEY": "",
+        "ADMIN_PUBKEYS": "",
         "ENABLE_SFTP_USER": "false",
         "SFTP_USER": "sftpuser",
         "USE_233BOY_INSTALLER": "false",

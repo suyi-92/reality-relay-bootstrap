@@ -24,7 +24,7 @@ info "当前 SSH 服务名：$(ssh_service_name)"
 info "配置中的 SSH_PORT=$SSH_PORT；防火墙阶段会先放行该端口。"
 
 if [[ -z "$ADMIN_PUBKEY" && ! -s /root/.ssh/authorized_keys ]]; then
-  die "ADMIN_PUBKEY 为空，且 /root/.ssh/authorized_keys 不存在或为空。请在 config.env 填入本地公钥。"
+  die "ADMIN_PUBKEY/ADMIN_PUBKEYS 为空，且 /root/.ssh/authorized_keys 不存在或为空。请在 config.env 填入至少一个本地公钥。"
 fi
 
 if port_in_use_by_other "$DIRECT_PORT"; then

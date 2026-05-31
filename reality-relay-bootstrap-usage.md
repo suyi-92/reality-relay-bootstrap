@@ -50,6 +50,45 @@ home-proxies.csv
 
 ---
 
+
+## 3.0 一键安装（推荐给首次使用）
+
+如果你希望尽量少编辑文件，可以直接使用 `install.sh`。它会用漂亮的交互式提示收集少量必要信息，然后自动生成 `config.env` 和 `home-proxies.csv`：
+
+```bash
+bash <(wget -qO- https://raw.githubusercontent.com/suyi-92/reality-relay-bootstrap/main/install.sh)
+```
+
+已经 `git clone` 到服务器时，也可以进入项目目录后运行：
+
+```bash
+sudo bash install.sh
+```
+
+一键脚本当前只让你填写这些内容，其余变量使用默认值；其中 `ADMIN_PUBKEY` 会逐条询问，可以添加多个：
+
+| 需要填写 | 默认值/提示 | 说明 |
+|---|---|---|
+| `SERVER_ALIAS` | `my-vps` | 服务器别名，也会作为 443 节点名称 |
+| `SERVER_IP` | 自动探测公网 IPv4，失败时为空 | 服务器公网 IP |
+| `SSH_PORT` | `22` | 当前 SSH 端口 |
+| `ADMIN_USER` | `admin` | 新建管理用户 |
+| `ADMIN_PUBKEY` | `/root/.ssh/authorized_keys` 中已有公钥会逐条弹出，若存在 | 本地 SSH 公钥，可填写多个 |
+| `home-proxies.csv` | 逐条提示 `home-01`、`51043`、`socks5`、`1080`、`tcp` 等默认值 | 家宽出口列表 |
+
+注意事项：
+
+1. 脚本会把远程一键模式的项目目录放在 `/opt/reality-relay-bootstrap`；可通过 `RRB_INSTALL_DIR=/path bash <(wget ...)` 覆盖。
+2. 写出的 `config.env` 和 `home-proxies.csv` 权限会设置为 `600`，不要公开。
+3. 执行到 `ssh-phase1` 后，脚本会停下来提示你另开窗口测试 admin key 登录；只有你确认成功后，才继续执行 `ssh-final`、fail2ban、sing-box、UFW、验证和节点输出。
+4. 如果只想生成配置、不自动跑部署阶段，可使用：
+
+```bash
+RRB_RUN_PHASES=false sudo bash install.sh
+```
+
+---
+
 ## 3. 部署前准备
 
 ### 3.1 本地准备 SSH 公钥
@@ -166,6 +205,10 @@ SSH_PORT="22"
 INITIAL_USER="root"
 ADMIN_USER="admin"
 ADMIN_PUBKEY="ssh-ed25519 AAAA...你的本地公钥"
+# 多个 admin 公钥可以写在同一个变量里：
+# ADMIN_PUBKEY=$'ssh-ed25519 AAAA... user1\nssh-ed25519 BBBB... user2'
+# 或把额外公钥逐行写入 ADMIN_PUBKEYS。
+ADMIN_PUBKEYS=""
 ENABLE_SFTP_USER="false"
 SFTP_USER="sftpuser"
 USE_233BOY_INSTALLER="false"
@@ -213,10 +256,23 @@ CLASH_MIXED_PORT="7890"
 | `SSH_PORT` | 当前 SSH 端口 | `22` |
 | `INITIAL_USER` | 服务商初始用户；当前仅作为预留/记录字段，实际 SSH 登录仍由你手动完成 | `root` |
 | `ADMIN_USER` | 新建管理用户 | `admin` |
-| `ADMIN_PUBKEY` | 本地 SSH 公钥 | `ssh-ed25519 AAAA...` |
+| `ADMIN_PUBKEY` | 本地 SSH 公钥；支持逐行多个 | `ssh-ed25519 AAAA...` |
 | `ADMIN_SUDO_NOPASSWD` | admin 是否免密 sudo | `true` |
 
 建议明确填写 `ADMIN_PUBKEY`。如果留空，脚本会尝试复制 `/root/.ssh/authorized_keys` 给 admin，但这依赖 root 当前已有正确公钥。
+
+需要给多个管理员设备授权时，有两种写法：
+
+```bash
+ADMIN_PUBKEY=$'ssh-ed25519 AAAA... user1\nssh-ed25519 BBBB... user2'
+```
+
+或者保留第一条在 `ADMIN_PUBKEY`，把额外公钥逐行放进 `ADMIN_PUBKEYS`：
+
+```bash
+ADMIN_PUBKEY="ssh-ed25519 AAAA... user1"
+ADMIN_PUBKEYS=$'ssh-ed25519 BBBB... user2\nssh-ed25519 CCCC... user3'
+```
 
 `INITIAL_USER` 当前不会被脚本用来发起 SSH 登录或切换用户；它只是记录你服务商初始登录用户，真正的第一次登录仍需要你手动完成。
 
@@ -415,7 +471,7 @@ cat config.env
 复制模板文件并打开编辑：
 
 ~~~bash
-cp home-proxies.example.env home-proxies.csv
+cp home-proxies.example.csv home-proxies.csv
 nano home-proxies.csv
 ~~~
 
@@ -1243,7 +1299,7 @@ sudo bash bootstrap.sh --phase validate
 部署完成后逐项确认：
 
 ```text
-[ ] config.env 已填写 SERVER_IP、ADMIN_USER、ADMIN_PUBKEY
+[ ] config.env 已填写 SERVER_IP、ADMIN_USER、至少一个 ADMIN_PUBKEY
 [ ] home-proxies.csv 表头正确
 [ ] CSV 里没有 443
 [ ] CSV listen_port 没有重复
