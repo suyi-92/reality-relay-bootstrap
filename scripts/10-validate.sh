@@ -77,10 +77,11 @@ else
 fi
 if ! is_dry_run; then
   for port in "${PORTS[@]}"; do
-    if ss -H -ltn 2>/dev/null | awk '{print $4}' | grep -Eq "(:|\\])${port}$"; then
+    if wait_for_port_listener "$port" 15; then
       info "端口监听正常：$port"
     else
-      die "未发现监听端口：$port"
+      diagnose_singbox_listeners
+      die "未发现监听端口：$port；已等待 15 秒，详见上方 sing-box 状态和日志。"
     fi
   done
 fi

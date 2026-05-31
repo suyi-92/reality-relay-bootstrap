@@ -374,6 +374,31 @@ port_in_use_by_other() {
   return 0
 }
 
+wait_for_port_listener() {
+  local port="$1" timeout="${2:-15}" deadline
+  deadline=$((SECONDS + timeout))
+  while (( SECONDS <= deadline )); do
+    if port_line_matches "$port" >/dev/null; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+diagnose_singbox_listeners() {
+  warn "当前 TCP 监听端口如下（用于排查 sing-box 未监听问题）："
+  (ss -H -ltnp 2>/dev/null || ss -H -ltn 2>/dev/null || true) | tee -a "$LOG_FILE" >&2
+  if command -v systemctl >/dev/null 2>&1; then
+    warn "sing-box systemd 状态摘要："
+    systemctl --no-pager --full status sing-box 2>&1 | tail -n 40 | tee -a "$LOG_FILE" >&2 || true
+  fi
+  if command -v journalctl >/dev/null 2>&1; then
+    warn "sing-box 最近日志："
+    journalctl -u sing-box --no-pager -n 80 2>&1 | tee -a "$LOG_FILE" >&2 || true
+  fi
+}
+
 write_root_file() {
   local path="$1" mode="$2"
   local tmp
