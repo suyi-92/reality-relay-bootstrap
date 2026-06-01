@@ -117,6 +117,7 @@ $(if [[ -n "$(server_ipv6_hosts)" ]]; then
     printf '  %s:  http://%s:%s%s\n' "$target_label" "$h" "$SUBSCRIPTION_PORT" "$target_path"
   done
 fi)
+
 说明：订阅内容按 SERVER_IP_IPV4/SERVER_IP_IPV6 生成；如果两者都填写，IPv4/IPv6 链接都返回同一份完整节点，IPv6 节点名称追加 -IPv6。
 如客户端无法导入 IPv6 字面量订阅地址，有 IPv4 时直接使用 IPv4 订阅地址即可。
 内置订阅服务是 HTTP；如需 HTTPS，请在外层接入带证书的反向代理。

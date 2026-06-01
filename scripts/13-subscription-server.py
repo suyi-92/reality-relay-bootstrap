@@ -111,13 +111,24 @@ def build_handler(root: Path, token_file: Path, default_target: str):
                 return
             self.send_body(200, body, content_type)
 
+        def do_OPTIONS(self) -> None:
+            self.send_response(204)
+            self.send_common_headers(0, "text/plain; charset=utf-8")
+            self.end_headers()
+
         def send_body(self, status: int, body: bytes, content_type: str) -> None:
             self.send_response(status)
-            self.send_header("Content-Type", content_type)
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
+            self.send_common_headers(len(body), content_type)
             self.end_headers()
             self.wfile.write(body)
+
+        def send_common_headers(self, body_len: int, content_type: str) -> None:
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(body_len))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "*")
 
     return SubscriptionHandler
 

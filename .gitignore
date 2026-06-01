@@ -2,5 +2,6 @@ config.env
 home-proxies.csv
 *.log
 *.bak
+__pycache__/
 reality-relay-bootstrap-nodes.txt
 reality-relay-bootstrap-clash.yaml

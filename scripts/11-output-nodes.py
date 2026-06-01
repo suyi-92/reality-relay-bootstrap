@@ -179,6 +179,7 @@ def build_clash_yaml(env: Dict[str, str], nodes: List[Dict[str, Any]], clash_ipv
             lines.append(f"    flow: {q(node['flow'])}")
         lines.extend(
             [
+                "    network: tcp",
                 "    tls: true",
                 f"    servername: {q(node['servername'])}",
                 f"    client-fingerprint: {q(node['client-fingerprint'])}",
