@@ -140,9 +140,20 @@ fi
 cat <<EOF
 
 回滚流程完成。建议立刻另开窗口测试 SSH：
-$(for host in $(server_hosts); do
-  printf '  ssh -p %s %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
-done)
+$(if [[ -n "$(server_ipv4_hosts)" ]]; then
+  printf 'IPv4:\n'
+  for host in $(server_ipv4_hosts); do
+    printf '  ssh -p %s %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
+  done
+  printf '\n'
+fi)
+$(if [[ -n "$(server_ipv6_hosts)" ]]; then
+  printf 'IPv6:\n'
+  for host in $(server_ipv6_hosts); do
+    printf '  ssh -p %s %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
+  done
+  printf '\n'
+fi)
 
 可选环境变量：
   RESTORE_FULL_SSH_BACKUP=yes      恢复完整 SSH 备份

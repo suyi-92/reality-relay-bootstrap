@@ -27,7 +27,9 @@ def yaml_bool(value: bool) -> str:
     return "true" if value else "false"
 
 
-def get_server_ip(env: Dict[str, str]) -> str:
+def get_server_ip(env: Dict[str, str], server_override: str = "") -> str:
+    if server_override.strip():
+        return server_override.strip()
     if env.get("SERVER_IP", "").strip():
         return env["SERVER_IP"].strip()
     if env.get("SERVER_IP_IPV4", "").strip():
@@ -50,18 +52,18 @@ def get_server_ip(env: Dict[str, str]) -> str:
     raise SystemExit("SERVER_IP 为空且无法自动获取公网 IP；请在 config.env 填写 SERVER_IP_IPV4 或 SERVER_IP_IPV6。")
 
 
-def build_nodes(env: Dict[str, str], rows: List[Dict[str, Any]], gen) -> List[Dict[str, Any]]:
+def build_nodes(env: Dict[str, str], rows: List[Dict[str, Any]], gen, server_override: str = "", name_suffix: str = "") -> List[Dict[str, Any]]:
     uuid = gen.read_vless_uuid(env)
     public_key = gen.read_reality_public_key(env)
     short_id = gen.read_reality_short_id(env)
-    server = get_server_ip(env)
+    server = get_server_ip(env, server_override)
     alpn = [item.strip() for item in env["CLIENT_ALPN"].split(",") if item.strip()]
     udp = gen.as_bool(env, "CLIENT_UDP")
 
     nodes = []
     for item in gen.node_list(env, rows):
         node: Dict[str, Any] = {
-            "name": item["name"],
+            "name": item["name"] + name_suffix,
             "type": "vless",
             "server": server,
             "port": int(item["port"]),
@@ -108,9 +110,9 @@ def node_to_text(node: Dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def build_clash_yaml(env: Dict[str, str], nodes: List[Dict[str, Any]]) -> str:
+def build_clash_yaml(env: Dict[str, str], nodes: List[Dict[str, Any]], clash_ipv6: str = "auto") -> str:
     names = [node["name"] for node in nodes]
-    ipv6_enabled = env["PROXY_IP_VERSION"] in {"ipv6", "dual"}
+    ipv6_enabled = env["PROXY_IP_VERSION"] in {"ipv6", "dual"} if clash_ipv6 == "auto" else clash_ipv6 == "true"
     lines = [
         f"mixed-port: {env['CLASH_MIXED_PORT']}",
         "allow-lan: false",
@@ -173,6 +175,11 @@ def main() -> int:
     ap.add_argument("--generator", required=True)
     ap.add_argument("--nodes-out", default="/root/reality-relay-bootstrap-nodes.txt")
     ap.add_argument("--clash-out", default="/root/reality-relay-bootstrap-clash.yaml")
+    ap.add_argument("--server-override", default="")
+    ap.add_argument("--name-suffix", default="")
+    ap.add_argument("--extra-server", default="")
+    ap.add_argument("--extra-name-suffix", default="")
+    ap.add_argument("--clash-ipv6", choices=["auto", "true", "false"], default="auto")
     args = ap.parse_args()
 
     env_path = Path(args.config_env).resolve()
@@ -180,10 +187,12 @@ def main() -> int:
     env = gen.defaults(gen.parse_env_file(env_path))
     gen.validate_env(env)
     rows = gen.load_rows(env, env_path.parent, allow_empty=True)
-    nodes = build_nodes(env, rows, gen)
+    nodes = build_nodes(env, rows, gen, args.server_override, args.name_suffix)
+    if args.extra_server:
+        nodes.extend(build_nodes(env, rows, gen, args.extra_server, args.extra_name_suffix))
 
     nodes_text = "\n---\n".join(node_to_text(node) for node in nodes) + "\n"
-    clash_yaml = build_clash_yaml(env, nodes)
+    clash_yaml = build_clash_yaml(env, nodes, args.clash_ipv6)
 
     for out, text in [(args.nodes_out, nodes_text), (args.clash_out, clash_yaml)]:
         path = Path(out)

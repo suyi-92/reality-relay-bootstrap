@@ -149,15 +149,30 @@ cat <<EOF
 
 验证完成。Windows PowerShell 建议继续测试：
 
-$(for host in $(server_hosts); do
-  for port in "${PORTS[@]}"; do
-    printf '  Test-NetConnection %s -Port %s\n' "$host" "$port"
+$(if [[ -n "$(server_ipv4_hosts)" ]]; then
+  printf 'IPv4:\n'
+  for host in $(server_ipv4_hosts); do
+    for port in "${PORTS[@]}"; do
+      printf '  Test-NetConnection %s -Port %s\n' "$host" "$port"
+    done
+    printf '\n'
+    printf '  ssh -p %s -o PreferredAuthentications=publickey -o PasswordAuthentication=no %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
+    printf '  ssh -p %s root@%s\n' "$SSH_PORT" "$host"
+    printf '  ssh -p %s -o PubkeyAuthentication=no -o PreferredAuthentications=password %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
   done
-done)
-
-$(for host in $(server_hosts); do
-  printf '  ssh -p %s -o PreferredAuthentications=publickey -o PasswordAuthentication=no %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
-  printf '  ssh -p %s root@%s\n' "$SSH_PORT" "$host"
-  printf '  ssh -p %s -o PubkeyAuthentication=no -o PreferredAuthentications=password %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
-done)
+  printf '\n'
+fi)
+$(if [[ -n "$(server_ipv6_hosts)" ]]; then
+  printf 'IPv6:\n'
+  for host in $(server_ipv6_hosts); do
+    for port in "${PORTS[@]}"; do
+      printf '  Test-NetConnection %s -Port %s\n' "$host" "$port"
+    done
+    printf '\n'
+    printf '  ssh -p %s -o PreferredAuthentications=publickey -o PasswordAuthentication=no %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
+    printf '  ssh -p %s root@%s\n' "$SSH_PORT" "$host"
+    printf '  ssh -p %s -o PubkeyAuthentication=no -o PreferredAuthentications=password %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
+  done
+  printf '\n'
+fi)
 EOF

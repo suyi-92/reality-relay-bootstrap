@@ -168,19 +168,34 @@ load_config() {
   resolve_csv_path
 }
 
-server_hosts() {
-  local fallback="${1:-服务器IP}" printed="false"
+server_ipv4_hosts() {
   if [[ -n "${SERVER_IP_IPV4:-}" ]]; then
     printf '%s\n' "$SERVER_IP_IPV4"
-    printed="true"
-  elif [[ -n "${SERVER_IP:-}" ]]; then
+  elif [[ -n "${SERVER_IP:-}" && "$SERVER_IP" != *:* ]]; then
     printf '%s\n' "$SERVER_IP"
-    printed="true"
   fi
+}
+
+server_ipv6_hosts() {
   if [[ -n "${SERVER_IP_IPV6:-}" ]]; then
     printf '%s\n' "$SERVER_IP_IPV6"
-    printed="true"
+  elif [[ -n "${SERVER_IP:-}" && "$SERVER_IP" == *:* ]]; then
+    printf '%s\n' "$SERVER_IP"
   fi
+}
+
+server_hosts() {
+  local fallback="${1:-服务器IP}" printed="false"
+  while IFS= read -r host; do
+    [[ -n "$host" ]] || continue
+    printf '%s\n' "$host"
+    printed="true"
+  done < <(server_ipv4_hosts)
+  while IFS= read -r host; do
+    [[ -n "$host" ]] || continue
+    printf '%s\n' "$host"
+    printed="true"
+  done < <(server_ipv6_hosts)
   [[ "$printed" == "true" ]] || printf '%s\n' "$fallback"
 }
 

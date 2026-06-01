@@ -168,11 +168,24 @@ cat <<EOF
 
 SSH 最终加固已应用。请不要关闭当前窗口，立刻另开 PowerShell 测试：
 
-$(for host in $(server_hosts); do
-  printf '  ssh -p %s -o PreferredAuthentications=publickey -o PasswordAuthentication=no %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
-  printf '  ssh -p %s root@%s\n' "$SSH_PORT" "$host"
-  printf '  ssh -p %s -o PubkeyAuthentication=no -o PreferredAuthentications=password %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
-done)
+$(if [[ -n "$(server_ipv4_hosts)" ]]; then
+  printf 'IPv4:\n'
+  for host in $(server_ipv4_hosts); do
+    printf '  ssh -p %s -o PreferredAuthentications=publickey -o PasswordAuthentication=no %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
+    printf '  ssh -p %s root@%s\n' "$SSH_PORT" "$host"
+    printf '  ssh -p %s -o PubkeyAuthentication=no -o PreferredAuthentications=password %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
+  done
+  printf '\n'
+fi)
+$(if [[ -n "$(server_ipv6_hosts)" ]]; then
+  printf 'IPv6:\n'
+  for host in $(server_ipv6_hosts); do
+    printf '  ssh -p %s -o PreferredAuthentications=publickey -o PasswordAuthentication=no %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
+    printf '  ssh -p %s root@%s\n' "$SSH_PORT" "$host"
+    printf '  ssh -p %s -o PubkeyAuthentication=no -o PreferredAuthentications=password %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
+  done
+  printf '\n'
+fi)
 
 预期：
   1. ${ADMIN_USER} key 登录成功。

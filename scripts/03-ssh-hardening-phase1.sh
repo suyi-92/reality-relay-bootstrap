@@ -26,9 +26,26 @@ cat <<EOF
 SSH phase1 已完成；当前仍未禁用 root/密码登录。
 
 请保留当前 SSH 窗口，另开一个新的 Windows PowerShell 测试 admin key 登录：
-$(for host in $(server_hosts); do
-  printf '  ssh -p %s -o PreferredAuthentications=publickey -o PasswordAuthentication=no %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
-done)
+$(if [[ -n "$(server_ipv4_hosts)" ]]; then
+  printf 'IPv4:\n'
+  for host in $(server_ipv4_hosts); do
+    printf '  ssh -p %s -o PreferredAuthentications=publickey -o PasswordAuthentication=no %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
+  done
+  printf '\n'
+fi)
+$(if [[ -n "$(server_ipv6_hosts)" ]]; then
+  printf 'IPv6:\n'
+  for host in $(server_ipv6_hosts); do
+    printf '  ssh -p %s -o PreferredAuthentications=publickey -o PasswordAuthentication=no %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
+  done
+  printf '\n'
+fi)
+$(if [[ -z "$(server_ipv4_hosts)" && -z "$(server_ipv6_hosts)" ]]; then
+  for host in $(server_hosts); do
+    printf '  ssh -p %s -o PreferredAuthentications=publickey -o PasswordAuthentication=no %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
+  done
+  printf '\n'
+fi)
 
 登录成功后在新窗口执行：
   whoami

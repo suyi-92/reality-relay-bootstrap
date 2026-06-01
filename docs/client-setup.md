@@ -23,6 +23,7 @@ http://服务器IP:51040/clash.yaml
 ```
 
 这是无鉴权 HTTP 文件服务，建议只在服务商安全组里放行你的常用来源 IP。
+如果同时配置了 IPv4 和 IPv6，IPv4 订阅只返回 IPv4 节点，IPv6 订阅返回 IPv4 + IPv6 双栈节点。
 
 如果 `PROXY_IP_VERSION="ipv6"` 或 `PROXY_IP_VERSION="dual"`，生成的 Clash/Mihomo 配置会启用 `ipv6: true`；默认 `ipv4` 会保持 `ipv6: false`。
 

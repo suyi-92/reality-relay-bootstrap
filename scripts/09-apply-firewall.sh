@@ -46,7 +46,18 @@ $(if [[ "$ENABLE_SUBSCRIPTION_SERVER" == "true" ]]; then printf '  Subscription:
 
 不要无脑开放 ${HOME_PORT_START}:${HOME_PORT_END}，除非你确认所有端口都会使用。
 启用 UFW 后请另开窗口测试 SSH：
-$(for host in $(server_hosts); do
-  printf '  ssh -p %s %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
-done)
+$(if [[ -n "$(server_ipv4_hosts)" ]]; then
+  printf 'IPv4:\n'
+  for host in $(server_ipv4_hosts); do
+    printf '  ssh -p %s %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
+  done
+  printf '\n'
+fi)
+$(if [[ -n "$(server_ipv6_hosts)" ]]; then
+  printf 'IPv6:\n'
+  for host in $(server_ipv6_hosts); do
+    printf '  ssh -p %s %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
+  done
+  printf '\n'
+fi)
 EOF

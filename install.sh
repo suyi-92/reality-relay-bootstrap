@@ -159,6 +159,15 @@ read_bool_value() {
   done
 }
 
+url_host() {
+  local host="$1"
+  if [[ "$host" == *:* && "$host" != \[*\] ]]; then
+    printf '[%s]\n' "$host"
+  else
+    printf '%s\n' "$host"
+  fi
+}
+
 public_ipv4() {
   local ip=""
   if command -v curl >/dev/null 2>&1; then
@@ -332,7 +341,7 @@ collect_home_proxies() {
 }
 
 run_install_flow() {
-  local project_dir="$1" server_ip_ipv4="$2" server_ip_ipv6="$3" ssh_port="$4" admin_user="$5"
+  local project_dir="$1" server_ip_ipv4="$2" server_ip_ipv6="$3" ssh_port="$4" admin_user="$5" enable_subscription_server="$6" subscription_port="$7"
   cd "$project_dir"
   line
   printf '%b\n' "${GREEN}${BOLD}配置文件已生成：${RESET}"
@@ -351,8 +360,14 @@ run_install_flow() {
   line
   printf '%b\n' "${YELLOW}${BOLD}安全确认：不要关闭当前 SSH 窗口。${RESET}"
   printf '请另开一个终端，确认下面命令可以通过公钥登录并 sudo 成功：\n\n'
-  [[ -n "$server_ip_ipv4" ]] && printf '  ssh -p %q -o PreferredAuthentications=publickey -o PasswordAuthentication=no %q@%q\n' "$ssh_port" "$admin_user" "$server_ip_ipv4"
-  [[ -n "$server_ip_ipv6" ]] && printf '  ssh -p %q -o PreferredAuthentications=publickey -o PasswordAuthentication=no %q@%q\n' "$ssh_port" "$admin_user" "$server_ip_ipv6"
+  if [[ -n "$server_ip_ipv4" ]]; then
+    printf 'IPv4:\n'
+    printf '  ssh -p %q -o PreferredAuthentications=publickey -o PasswordAuthentication=no %q@%q\n\n' "$ssh_port" "$admin_user" "$server_ip_ipv4"
+  fi
+  if [[ -n "$server_ip_ipv6" ]]; then
+    printf 'IPv6:\n'
+    printf '  ssh -p %q -o PreferredAuthentications=publickey -o PasswordAuthentication=no %q@%q\n\n' "$ssh_port" "$admin_user" "$server_ip_ipv6"
+  fi
   printf '  whoami && sudo whoami\n\n'
   printf '确认输出包含 %q 和 root 后，再回到这里继续。\n' "$admin_user"
   if read_yes_no "我已确认 admin 公钥登录和 sudo 正常，继续 SSH final 加固？" no; then
@@ -371,6 +386,24 @@ run_install_flow() {
   printf '%b\n' "${GREEN}${BOLD}部署完成。节点文件：${RESET}"
   printf '  sudo cat /root/reality-relay-bootstrap-nodes.txt\n'
   printf '  sudo cat /root/reality-relay-bootstrap-clash.yaml\n'
+  if [[ "$enable_subscription_server" == "true" ]]; then
+    printf '\n订阅链接：\n'
+    if [[ -n "$server_ip_ipv4" ]]; then
+      local h4
+      h4="$(url_host "$server_ip_ipv4")"
+      printf 'IPv4:\n'
+      printf '  Clash/Mihomo:  http://%s:%s/clash.yaml\n' "$h4" "$subscription_port"
+      printf '  节点文本:      http://%s:%s/nodes.txt\n\n' "$h4" "$subscription_port"
+    fi
+    if [[ -n "$server_ip_ipv6" ]]; then
+      local h6
+      h6="$(url_host "$server_ip_ipv6")"
+      printf 'IPv6:\n'
+      printf '  Clash/Mihomo:  http://%s:%s/clash.yaml\n' "$h6" "$subscription_port"
+      printf '  节点文本:      http://%s:%s/nodes.txt\n\n' "$h6" "$subscription_port"
+    fi
+    printf '说明：IPv4 订阅只返回 IPv4 节点；IPv6 订阅返回 IPv4 + IPv6 双栈节点。\n'
+  fi
 }
 
 main() {
@@ -408,7 +441,7 @@ main() {
 
   write_config "$project_dir" "$server_alias" "$server_ip_ipv4" "$server_ip_ipv6" "$ssh_port" "$admin_user" "$admin_pubkey" "$direct_port" "$enable_subscription_server" "$subscription_port" "$home_port_start" "$home_port_end"
   write_home_proxies "$project_dir" "$ROWS_FILE"
-  run_install_flow "$project_dir" "$server_ip_ipv4" "$server_ip_ipv6" "$ssh_port" "$admin_user"
+  run_install_flow "$project_dir" "$server_ip_ipv4" "$server_ip_ipv6" "$ssh_port" "$admin_user" "$enable_subscription_server" "$subscription_port"
 }
 
 main "$@"
