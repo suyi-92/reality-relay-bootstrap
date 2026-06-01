@@ -815,7 +815,7 @@ sudo bash bootstrap.sh --phase firewall
 订阅地址：
 
 ```text
-http://服务器IP:51040/sub/<VLESS_UUID>&target=mihomo
+http://服务器IP:51040/sub/<VLESS_UUID>?target=mihomo
 ```
 
 `<VLESS_UUID>` 来自 `/etc/reality-relay-bootstrap/vless-uuid.txt`。内置订阅服务是 HTTP；如需 HTTPS，请在外层接入带证书的反向代理。仍建议只在服务商安全组里放行你的常用来源 IP。

@@ -105,7 +105,7 @@ fi
 
 token="$(subscription_token)"
 target_label="$(subscription_target_label "$SUBSCRIPTION_TARGET")"
-target_path="/sub/${token}&target=${SUBSCRIPTION_TARGET}"
+target_path="/sub/${token}?target=${SUBSCRIPTION_TARGET}"
 
 cat <<EOF
 
