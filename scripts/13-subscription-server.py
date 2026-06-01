@@ -85,7 +85,7 @@ def build_handler(root: Path, token_file: Path, default_target: str):
         def do_GET(self) -> None:
             split = urlsplit(self.path)
             if split.path == "/":
-                self.send_body(200, b"subscription path: /sub/<token>/ClashMeta\n", "text/plain; charset=utf-8")
+                self.send_body(200, b"subscription path: /sub/<token>?target=ClashMeta\n", "text/plain; charset=utf-8")
                 return
             if not split.path.startswith("/sub/"):
                 self.send_body(404, b"not found\n", "text/plain; charset=utf-8")

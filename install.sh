@@ -444,7 +444,7 @@ run_install_flow() {
     local token target_label target_path
     token="$(subscription_token)"
     target_label="$(subscription_target_label "$subscription_target")"
-    target_path="/sub/${token}/${subscription_target}"
+    target_path="/sub/${token}?target=${subscription_target}"
     printf '\n订阅链接：\n'
     if [[ -n "$server_ip_ipv4" ]]; then
       local h4
