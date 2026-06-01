@@ -39,6 +39,7 @@ reality-relay-bootstrap/
     11-output-nodes-wrapper.sh
     12-rollback.sh
     13-setup-subscription.sh
+    13-subscription-server.py
   templates/
     sshd-hardening.conf.tpl
     fail2ban-sshd.local.tpl
@@ -53,7 +54,7 @@ reality-relay-bootstrap/
 
 更详细的参数解释、Windows PowerShell 示例、回滚和客户端导入说明，请阅读 [`reality-relay-bootstrap-usage.md`](./reality-relay-bootstrap-usage.md)。
 
-如果是在全新 VPS 上使用推荐默认值部署，可以直接运行一键安装脚本。脚本会自动拉取/定位项目、生成 `config.env` 和 `home-proxies.csv`，会提示填写服务器 IPv4/IPv6、SSH、入口端口、订阅端口、管理员公钥以及家宽代理 CSV 内容：
+如果是在全新 VPS 上使用推荐默认值部署，可以直接运行一键安装脚本。脚本会自动拉取/定位项目、生成 `config.env` 和 `home-proxies.csv`，会提示填写服务器 IPv4/IPv6、SSH、入口端口、是否重置密钥、订阅端口/格式、管理员公钥以及家宽代理 CSV 内容：
 
 ```bash
 bash <(wget -qO- https://raw.githubusercontent.com/suyi-92/reality-relay-bootstrap/main/install.sh)
@@ -117,6 +118,7 @@ MODE_443="direct"
 ```bash
 PROXY_PROTOCOL="vless-reality"
 PROXY_IP_VERSION="ipv4"
+RESET_PROXY_KEYS="false"
 RRB_STATE_DIR="/etc/reality-relay-bootstrap"
 VLESS_UUID_PATH="/etc/reality-relay-bootstrap/vless-uuid.txt"
 VLESS_FLOW="xtls-rprx-vision"
@@ -133,6 +135,7 @@ CLIENT_ALPN="h2,http/1.1"
 ```
 
 `PROXY_IP_VERSION` 可选 `ipv4`、`ipv6`、`dual`；默认 `ipv4`。`dual` 表示双栈可用并优先 IPv4。
+`RESET_PROXY_KEYS=false` 时重复运行不会轮换 VLESS UUID、Reality keypair 和 short-id；改为 `true` 会生成新密钥，旧节点和旧订阅 token 会失效。
 
 首次执行 `--phase singbox` 会自动生成：
 
@@ -261,6 +264,7 @@ sudo cat /root/reality-relay-bootstrap-clash.yaml
 ```bash
 ENABLE_SUBSCRIPTION_SERVER="true"
 SUBSCRIPTION_PORT="51040"
+SUBSCRIPTION_TARGET="mihomo"
 ```
 
 然后执行：
@@ -273,12 +277,12 @@ sudo bash bootstrap.sh --phase firewall
 订阅地址：
 
 ```text
-http://服务器IP:51040/clash.yaml
-http://服务器IP:51040/nodes.txt
+http://服务器IP:51040/sub/<VLESS_UUID>&target=mihomo
 ```
 
-这是简单 HTTP 文件服务，没有鉴权；建议只在服务商安全组里放行你的常用来源 IP。
-如果同时配置了 IPv4 和 IPv6，IPv4 订阅只返回 IPv4 节点，IPv6 订阅返回 IPv4 + IPv6 双栈节点。
+内置服务是 HTTP，URL 里的 token 使用 `/etc/reality-relay-bootstrap/vless-uuid.txt`。仍建议只在服务商安全组里放行你的常用来源 IP。
+`SUBSCRIPTION_TARGET` 支持 `mihomo`、`v2ray`、`shadowsocks`、`ssr`、`quantumultx`、`shadowrocket`；默认只生成 Mihomo。当前项目的节点协议仍是 VLESS+Reality，非 Mihomo target 会输出 VLESS URI 订阅。
+如果同时配置了 IPv4 和 IPv6，两个订阅链接都返回同一份完整节点；IPv4 节点名称保持不变，IPv6 节点名称追加 `-IPv6`。
 
 输出节点包括：
 

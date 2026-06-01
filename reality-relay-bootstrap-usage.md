@@ -76,8 +76,10 @@ sudo bash install.sh
 | `SSH_PORT` | `22` | 当前 SSH 端口 |
 | `ADMIN_USER` | `admin` | 新建管理用户 |
 | `DIRECT_PORT` | `443` | VLESS+Reality 直连入口端口 |
+| `RESET_PROXY_KEYS` | `false` | 是否重置 VLESS UUID、Reality keypair 和 short-id |
 | `ENABLE_SUBSCRIPTION_SERVER` | `true` | 是否开启简单订阅端口 |
 | `SUBSCRIPTION_PORT` | `51040` | 订阅端口；仅开启订阅服务时询问 |
+| `SUBSCRIPTION_TARGET` | `Mihomo` | 订阅格式；仅开启订阅服务时询问 |
 | `HOME_PORT_START` / `HOME_PORT_END` | `51043` / `51060` | 家宽入口端口范围 |
 | `ADMIN_PUBKEY` | 空回车结束 | 本地 SSH 公钥，可填写多个 |
 | `home-proxies.csv` | 可逐条提示，也可一次性粘贴多行 CSV | 家宽出口列表；字段顺序同模板 |
@@ -238,6 +240,7 @@ SINGBOX_CONFIG_PATH="/etc/sing-box/config.json"
 
 PROXY_PROTOCOL="vless-reality"
 PROXY_IP_VERSION="ipv4"
+RESET_PROXY_KEYS="false"
 VLESS_UUID_PATH="/etc/reality-relay-bootstrap/vless-uuid.txt"
 VLESS_FLOW="xtls-rprx-vision"
 REALITY_PRIVATE_KEY_PATH="/etc/reality-relay-bootstrap/reality-private.key"
@@ -420,6 +423,7 @@ RRB_STATE_DIR="/etc/reality-relay-bootstrap"
 ```bash
 PROXY_PROTOCOL="vless-reality"
 PROXY_IP_VERSION="ipv4"
+RESET_PROXY_KEYS="false"
 VLESS_UUID_PATH="/etc/reality-relay-bootstrap/vless-uuid.txt"
 VLESS_FLOW="xtls-rprx-vision"
 REALITY_PRIVATE_KEY_PATH="/etc/reality-relay-bootstrap/reality-private.key"
@@ -438,6 +442,8 @@ REALITY_MAX_TIME_DIFFERENCE="1m"
 | `ipv4` | 只走 IPv4，默认值 |
 | `ipv6` | 只走 IPv6 |
 | `dual` | IPv4/IPv6 双栈，优先 IPv4 |
+
+`RESET_PROXY_KEYS=false` 时重复运行 `singbox` 或一键安装不会轮换 VLESS UUID、Reality keypair 和 short-id；改成 `true` 会生成新密钥，旧节点和旧订阅 token 会失效。
 
 首次执行 `singbox` 阶段时会自动生成：
 
@@ -796,6 +802,7 @@ sudo cat /root/reality-relay-bootstrap-clash.yaml
 ```bash
 ENABLE_SUBSCRIPTION_SERVER="true"
 SUBSCRIPTION_PORT="51040"
+SUBSCRIPTION_TARGET="mihomo"
 ```
 
 然后执行：
@@ -808,12 +815,14 @@ sudo bash bootstrap.sh --phase firewall
 订阅地址：
 
 ```text
-http://服务器IP:51040/clash.yaml
-http://服务器IP:51040/nodes.txt
+http://服务器IP:51040/sub/<VLESS_UUID>&target=mihomo
 ```
 
-该端口是无鉴权 HTTP 文件服务，建议只在服务商安全组里放行你的常用来源 IP。
-如果同时配置了 IPv4 和 IPv6，IPv4 订阅只返回 IPv4 节点，IPv6 订阅返回 IPv4 + IPv6 双栈节点。
+`<VLESS_UUID>` 来自 `/etc/reality-relay-bootstrap/vless-uuid.txt`。内置订阅服务是 HTTP；如需 HTTPS，请在外层接入带证书的反向代理。仍建议只在服务商安全组里放行你的常用来源 IP。
+
+`SUBSCRIPTION_TARGET` 支持 `mihomo`、`v2ray`、`shadowsocks`、`ssr`、`quantumultx`、`shadowrocket`；默认只生成 Mihomo。当前项目仍生成 VLESS+Reality 节点，非 Mihomo target 会输出 VLESS URI 订阅。
+
+如果同时配置了 IPv4 和 IPv6，两个订阅链接都返回同一份完整节点；IPv4 节点名称保持不变，IPv6 节点名称追加 `-IPv6`。
 
 ---
 
@@ -1069,6 +1078,20 @@ sudo ufw delete 编号
 ## 16. 更换 VLESS UUID 或 Reality key
 
 一般不建议频繁更换。更换后所有客户端节点都要重新导入。
+
+一键安装或 `config.env` 推荐用统一开关：
+
+```bash
+RESET_PROXY_KEYS="true"
+sudo bash bootstrap.sh --phase singbox
+sudo bash bootstrap.sh --phase output-nodes
+```
+
+执行完成后建议改回：
+
+```bash
+RESET_PROXY_KEYS="false"
+```
 
 ### 16.1 更换 UUID
 

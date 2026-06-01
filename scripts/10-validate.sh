@@ -163,7 +163,7 @@ $(if [[ -n "$(server_ipv4_hosts)" ]]; then
   printf '\n'
 fi)
 $(if [[ -n "$(server_ipv6_hosts)" ]]; then
-  printf 'IPv6:\n'
+  printf '\nIPv6:\n'
   for host in $(server_ipv6_hosts); do
     for port in "${PORTS[@]}"; do
       printf '  Test-NetConnection %s -Port %s\n' "$host" "$port"

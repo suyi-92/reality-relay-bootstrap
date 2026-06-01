@@ -3,12 +3,25 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import importlib.util
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
+from urllib.parse import quote, urlencode
+
+
+SUBSCRIPTION_TARGETS = {
+    "mihomo",
+    "v2ray",
+    "shadowsocks",
+    "ssr",
+    "quantumultx",
+    "shadowrocket",
+}
 
 
 def load_generator(path: Path):
@@ -25,6 +38,24 @@ def q(value: Any) -> str:
 
 def yaml_bool(value: bool) -> str:
     return "true" if value else "false"
+
+
+def normalize_subscription_target(value: str) -> str:
+    compact = re.sub(r"[\s_-]+", "", (value or "mihomo").lower())
+    aliases = {
+        "clash": "mihomo",
+        "clashmeta": "mihomo",
+        "v2rayn": "v2ray",
+        "v2rayng": "v2ray",
+        "ss": "shadowsocks",
+        "shadowsocksr": "ssr",
+        "quanx": "quantumultx",
+        "quantumult": "quantumultx",
+    }
+    target = aliases.get(compact, compact)
+    if target not in SUBSCRIPTION_TARGETS:
+        raise SystemExit(f"SUBSCRIPTION_TARGET 不支持：{value}")
+    return target
 
 
 def get_server_ip(env: Dict[str, str], server_override: str = "") -> str:
@@ -163,6 +194,46 @@ def build_clash_yaml(env: Dict[str, str], nodes: List[Dict[str, Any]], clash_ipv
     return "\n".join(lines)
 
 
+def uri_host(host: str) -> str:
+    if ":" in host and not host.startswith("["):
+        return f"[{host}]"
+    return host
+
+
+def node_to_vless_uri(node: Dict[str, Any]) -> str:
+    params = {
+        "encryption": "none",
+        "security": "reality",
+        "sni": node["servername"],
+        "fp": node["client-fingerprint"],
+        "pbk": node["reality-opts"]["public-key"],
+        "sid": node["reality-opts"]["short-id"],
+        "type": "tcp",
+    }
+    if node.get("flow"):
+        params["flow"] = node["flow"]
+    if node.get("alpn"):
+        params["alpn"] = ",".join(node["alpn"])
+    query = urlencode(params)
+    return f"vless://{node['uuid']}@{uri_host(node['server'])}:{node['port']}?{query}#{quote(node['name'])}"
+
+
+def build_uri_subscription(nodes: List[Dict[str, Any]], *, base64_encode: bool) -> str:
+    text = "\n".join(node_to_vless_uri(node) for node in nodes) + "\n"
+    if not base64_encode:
+        return text
+    return base64.b64encode(text.encode("utf-8")).decode("ascii") + "\n"
+
+
+def build_subscription_payload(target: str, clash_yaml: str, nodes: List[Dict[str, Any]]) -> str:
+    target = normalize_subscription_target(target)
+    if target == "mihomo":
+        return clash_yaml
+    if target == "v2ray":
+        return build_uri_subscription(nodes, base64_encode=True)
+    return build_uri_subscription(nodes, base64_encode=False)
+
+
 def mask(value: str) -> str:
     if len(value) <= 8:
         return "***"
@@ -180,6 +251,8 @@ def main() -> int:
     ap.add_argument("--extra-server", default="")
     ap.add_argument("--extra-name-suffix", default="")
     ap.add_argument("--clash-ipv6", choices=["auto", "true", "false"], default="auto")
+    ap.add_argument("--subscription-target", default="")
+    ap.add_argument("--subscription-out", default="")
     args = ap.parse_args()
 
     env_path = Path(args.config_env).resolve()
@@ -202,6 +275,18 @@ def main() -> int:
         os.chmod(tmp, 0o600)
         tmp.replace(path)
         os.chmod(path, 0o600)
+
+    if args.subscription_out:
+        target = normalize_subscription_target(args.subscription_target or env.get("SUBSCRIPTION_TARGET", "mihomo"))
+        subscription_payload = build_subscription_payload(target, clash_yaml, nodes)
+        path = Path(args.subscription_out)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name(path.name + ".tmp")
+        tmp.write_text(subscription_payload, encoding="utf-8")
+        os.chmod(tmp, 0o600)
+        tmp.replace(path)
+        os.chmod(path, 0o600)
+        print(f"已生成 {target} 订阅文件：{args.subscription_out}")
 
     print(f"已生成节点文件：{args.nodes_out}")
     print(f"已生成 Clash/Mihomo 文件：{args.clash_out}")

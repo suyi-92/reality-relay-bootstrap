@@ -86,6 +86,15 @@ AI_IP_CIDRS = [
     "64.23.132.171/32",
 ]
 
+SUBSCRIPTION_TARGETS = {
+    "mihomo",
+    "v2ray",
+    "shadowsocks",
+    "ssr",
+    "quantumultx",
+    "shadowrocket",
+}
+
 
 class ConfigError(SystemExit):
     pass
@@ -167,6 +176,11 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
         "CLIENT_UDP": "false",
         "CLIENT_ALPN": "h2,http/1.1",
         "CLASH_MIXED_PORT": "7890",
+        "ENABLE_SUBSCRIPTION_SERVER": "false",
+        "SUBSCRIPTION_PORT": "51040",
+        "SUBSCRIPTION_DIR": f"{state_dir}/subscription",
+        "RESET_PROXY_KEYS": "false",
+        "SUBSCRIPTION_TARGET": "mihomo",
     }
     for k, v in d.items():
         merged.setdefault(k, v)
@@ -177,6 +191,7 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
         merged["SERVER_IP_IPV4"] = server_ip
     if not merged.get("SERVER_IP"):
         merged["SERVER_IP"] = merged.get("SERVER_IP_IPV4") or merged.get("SERVER_IP_IPV6") or ""
+    merged["SUBSCRIPTION_TARGET"] = normalize_subscription_target(merged.get("SUBSCRIPTION_TARGET", "mihomo"))
 
     default_state_dir = "/etc/reality-relay-bootstrap"
     if merged["RRB_STATE_DIR"] != default_state_dir:
@@ -190,6 +205,24 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
             if merged.get(key) == f"{default_state_dir}/{filename}":
                 merged[key] = f"{merged['RRB_STATE_DIR']}/{filename}"
     return merged
+
+
+def normalize_subscription_target(value: str) -> str:
+    compact = re.sub(r"[\s_-]+", "", (value or "mihomo").lower())
+    aliases = {
+        "clash": "mihomo",
+        "clashmeta": "mihomo",
+        "v2rayn": "v2ray",
+        "v2rayng": "v2ray",
+        "ss": "shadowsocks",
+        "shadowsocksr": "ssr",
+        "quanx": "quantumultx",
+        "quantumult": "quantumultx",
+    }
+    target = aliases.get(compact, compact)
+    if target not in SUBSCRIPTION_TARGETS:
+        raise ConfigError(f"SUBSCRIPTION_TARGET 不支持：{value}")
+    return target
 
 
 def as_bool(env: Dict[str, str], key: str) -> bool:
@@ -223,6 +256,7 @@ def validate_env(env: Dict[str, str]) -> None:
     start = as_port(env, "HOME_PORT_START")
     end = as_port(env, "HOME_PORT_END")
     as_port(env, "REALITY_HANDSHAKE_PORT")
+    as_port(env, "SUBSCRIPTION_PORT")
     if start > end:
         raise ConfigError("HOME_PORT_START 不能大于 HOME_PORT_END")
     if env["PROXY_PROTOCOL"] != "vless-reality":
@@ -248,8 +282,11 @@ def validate_env(env: Dict[str, str]) -> None:
         "ENABLE_IPV6_LISTEN",
         "REJECT_CN_PRIVATE",
         "CLIENT_UDP",
+        "ENABLE_SUBSCRIPTION_SERVER",
+        "RESET_PROXY_KEYS",
     ]:
         as_bool(env, key)
+    normalize_subscription_target(env.get("SUBSCRIPTION_TARGET", "mihomo"))
     if direct_port != 443:
         print(f"WARN: DIRECT_PORT={direct_port}，不是默认 443。", file=sys.stderr)
     if as_bool(env, "ENABLE_IPV6_LISTEN"):

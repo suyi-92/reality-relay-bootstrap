@@ -163,6 +163,11 @@ load_config() {
   : "${ENABLE_SUBSCRIPTION_SERVER:=false}"
   : "${SUBSCRIPTION_PORT:=51040}"
   : "${SUBSCRIPTION_DIR:=/etc/reality-relay-bootstrap/subscription}"
+  : "${RESET_PROXY_KEYS:=false}"
+  : "${SUBSCRIPTION_TARGET:=mihomo}"
+  if ! SUBSCRIPTION_TARGET="$(normalize_subscription_target "$SUBSCRIPTION_TARGET")"; then
+    die "SUBSCRIPTION_TARGET 不支持：${SUBSCRIPTION_TARGET:-空}；可选：mihomo、v2ray、shadowsocks、ssr、quantumultx、shadowrocket"
+  fi
 
   validate_config_basics
   resolve_csv_path
@@ -208,6 +213,41 @@ url_host() {
   fi
 }
 
+normalize_subscription_target() {
+  local raw="${1:-mihomo}" lower compact
+  lower="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
+  compact="$(printf '%s' "$lower" | tr -d ' _-')"
+  case "$compact" in
+    mihomo|clash|clashmeta) printf 'mihomo\n' ;;
+    v2ray|v2rayn|v2rayng) printf 'v2ray\n' ;;
+    shadowsocks|ss) printf 'shadowsocks\n' ;;
+    ssr|shadowsocksr) printf 'ssr\n' ;;
+    quantumultx|quanx|quantumult) printf 'quantumultx\n' ;;
+    shadowrocket) printf 'shadowrocket\n' ;;
+    *) return 1 ;;
+  esac
+}
+
+subscription_target_label() {
+  case "${1:-$SUBSCRIPTION_TARGET}" in
+    mihomo) printf 'Mihomo\n' ;;
+    v2ray) printf 'V2Ray\n' ;;
+    shadowsocks) printf 'Shadowsocks\n' ;;
+    ssr) printf 'SSR\n' ;;
+    quantumultx) printf 'Quantumult X\n' ;;
+    shadowrocket) printf 'Shadowrocket\n' ;;
+    *) printf '%s\n' "${1:-$SUBSCRIPTION_TARGET}" ;;
+  esac
+}
+
+subscription_token() {
+  if [[ -r "${VLESS_UUID_PATH:-}" ]]; then
+    tr -d '\r\n' < "$VLESS_UUID_PATH"
+  else
+    printf '<token>'
+  fi
+}
+
 validate_bool() {
   local name="$1" value="${!1}"
   case "$value" in true|false) ;; *) die "$name 必须是 true 或 false，当前：$value" ;; esac
@@ -238,8 +278,10 @@ validate_config_basics() {
   validate_bool REJECT_CN_PRIVATE
   validate_bool CLIENT_UDP
   validate_bool ENABLE_SUBSCRIPTION_SERVER
+  validate_bool RESET_PROXY_KEYS
   validate_user_name ADMIN_USER
   validate_user_name SFTP_USER
+  normalize_subscription_target "$SUBSCRIPTION_TARGET" >/dev/null || die "SUBSCRIPTION_TARGET 不支持：$SUBSCRIPTION_TARGET"
   (( HOME_PORT_START <= HOME_PORT_END )) || die "HOME_PORT_START 不能大于 HOME_PORT_END"
   [[ "$MODE_443" == "direct" || "$MODE_443" == "smart" ]] || die "MODE_443 只能是 direct 或 smart"
   [[ "$INSTALL_SINGBOX_METHOD" == "apt" || "$INSTALL_SINGBOX_METHOD" == "233boy" ]] || die "INSTALL_SINGBOX_METHOD 只能是 apt 或 233boy"

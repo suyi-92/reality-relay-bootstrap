@@ -1,17 +1,33 @@
 #!/usr/bin/env python3
-"""Serve IPv4-only subscriptions on IPv4 and dual-stack subscriptions on IPv6."""
+"""Serve token-protected subscription files on IPv4 and/or IPv6."""
 from __future__ import annotations
 
 import argparse
+import re
 import socket
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import List, Tuple
-from urllib.parse import urlsplit
+from typing import Dict, List, Tuple
+from urllib.parse import parse_qs, unquote, urlsplit
 
 
-class IPv6HTTPServer(ThreadingHTTPServer):
+TARGET_FILES: Dict[str, Tuple[str, str]] = {
+    "mihomo": ("mihomo.yaml", "text/yaml; charset=utf-8"),
+    "v2ray": ("v2ray.txt", "text/plain; charset=utf-8"),
+    "shadowsocks": ("shadowsocks.txt", "text/plain; charset=utf-8"),
+    "ssr": ("ssr.txt", "text/plain; charset=utf-8"),
+    "quantumultx": ("quantumultx.txt", "text/plain; charset=utf-8"),
+    "shadowrocket": ("shadowrocket.txt", "text/plain; charset=utf-8"),
+}
+
+
+class ReusableHTTPServer(ThreadingHTTPServer):
+    allow_reuse_address = True
+    daemon_threads = True
+
+
+class IPv6HTTPServer(ReusableHTTPServer):
     address_family = socket.AF_INET6
 
     def server_bind(self) -> None:
@@ -19,31 +35,76 @@ class IPv6HTTPServer(ThreadingHTTPServer):
         super().server_bind()
 
 
-def build_handler(root: Path, mode: str):
-    files = {
-        "/clash.yaml": ("clash.yaml", "text/yaml; charset=utf-8"),
-        "/nodes.txt": ("nodes.txt", "text/plain; charset=utf-8"),
+def normalize_target(value: str) -> str:
+    compact = re.sub(r"[\s_-]+", "", (value or "mihomo").lower())
+    aliases = {
+        "clash": "mihomo",
+        "clashmeta": "mihomo",
+        "v2rayn": "v2ray",
+        "v2rayng": "v2ray",
+        "ss": "shadowsocks",
+        "shadowsocksr": "ssr",
+        "quanx": "quantumultx",
+        "quantumult": "quantumultx",
     }
+    return aliases.get(compact, compact)
 
+
+def read_token(token_file: Path) -> str:
+    try:
+        return token_file.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+def split_token_and_target(raw_tail: str, query: str, default_target: str) -> Tuple[str, str]:
+    token = raw_tail
+    path_target = ""
+    if "&" in raw_tail:
+        token, rest = raw_tail.split("&", 1)
+        for part in rest.split("&"):
+            key, sep, value = part.partition("=")
+            if sep and key == "target":
+                path_target = value
+                break
+    qs = parse_qs(query, keep_blank_values=True)
+    query_target = (qs.get("target") or [""])[0]
+    return unquote(token), normalize_target(query_target or path_target or default_target)
+
+
+def build_handler(root: Path, token_file: Path, default_target: str):
     class SubscriptionHandler(BaseHTTPRequestHandler):
-        server_version = "RRBSubscription/1.0"
+        server_version = "RRBSubscription/2.0"
 
         def log_message(self, format: str, *args) -> None:  # noqa: A002
             return
 
         def do_GET(self) -> None:
-            path = urlsplit(self.path).path
-            if path == "/":
-                self.send_body(200, b"subscription files: /clash.yaml /nodes.txt\n", "text/plain; charset=utf-8")
+            split = urlsplit(self.path)
+            if split.path == "/":
+                self.send_body(200, b"subscription path: /sub/<token>&target=mihomo\n", "text/plain; charset=utf-8")
                 return
-            if path not in files:
+            if not split.path.startswith("/sub/"):
                 self.send_body(404, b"not found\n", "text/plain; charset=utf-8")
                 return
-            name, content_type = files[path]
+
+            request_token, target = split_token_and_target(split.path[len("/sub/") :], split.query, default_target)
+            expected_token = read_token(token_file)
+            if not expected_token:
+                self.send_body(503, b"subscription token not ready\n", "text/plain; charset=utf-8")
+                return
+            if request_token != expected_token:
+                self.send_body(403, b"forbidden\n", "text/plain; charset=utf-8")
+                return
+            if target not in TARGET_FILES:
+                self.send_body(400, b"unsupported target\n", "text/plain; charset=utf-8")
+                return
+
+            name, content_type = TARGET_FILES[target]
             try:
-                body = (root / mode / name).read_bytes()
+                body = (root / "all" / name).read_bytes()
             except OSError:
-                self.send_body(503, b"subscription not ready\n", "text/plain; charset=utf-8")
+                self.send_body(404, b"target subscription not generated\n", "text/plain; charset=utf-8")
                 return
             self.send_body(200, body, content_type)
 
@@ -68,13 +129,20 @@ def main() -> int:
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--ipv4", choices=["true", "false"], default="true")
     parser.add_argument("--ipv6", choices=["true", "false"], default="false")
+    parser.add_argument("--token-file", type=Path, required=True)
+    parser.add_argument("--default-target", default="mihomo")
     args = parser.parse_args()
 
+    default_target = normalize_target(args.default_target)
+    if default_target not in TARGET_FILES:
+        raise SystemExit(f"unsupported default target: {args.default_target}")
+
+    handler = build_handler(args.root, args.token_file, default_target)
     servers: List[Tuple[str, ThreadingHTTPServer]] = []
     if args.ipv4 == "true":
-        servers.append(("ipv4", ThreadingHTTPServer(("0.0.0.0", args.port), build_handler(args.root, "ipv4"))))
+        servers.append(("ipv4", ReusableHTTPServer(("0.0.0.0", args.port), handler)))
     if args.ipv6 == "true":
-        servers.append(("ipv6", IPv6HTTPServer(("::", args.port), build_handler(args.root, "dual"))))
+        servers.append(("ipv6", IPv6HTTPServer(("::", args.port), handler)))
     if not servers:
         raise SystemExit("at least one of --ipv4 or --ipv6 must be true")
 

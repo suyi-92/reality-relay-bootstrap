@@ -11,11 +11,21 @@ if is_dry_run; then
   exit 0
 fi
 
-python3 "$SCRIPT_DIR/11-output-nodes.py" \
-  --config-env "$RRB_CONFIG_FILE" \
-  --generator "$SCRIPT_DIR/08-generate-singbox-config.py" \
-  --nodes-out /root/reality-relay-bootstrap-nodes.txt \
+args=(
+  python3 "$SCRIPT_DIR/11-output-nodes.py"
+  --config-env "$RRB_CONFIG_FILE"
+  --generator "$SCRIPT_DIR/08-generate-singbox-config.py"
+  --nodes-out /root/reality-relay-bootstrap-nodes.txt
   --clash-out /root/reality-relay-bootstrap-clash.yaml
+)
+if [[ -n "$SERVER_IP_IPV4" && -n "$SERVER_IP_IPV6" ]]; then
+  args+=(--server-override "$SERVER_IP_IPV4" --extra-server "$SERVER_IP_IPV6" --extra-name-suffix=-IPv6 --clash-ipv6 true)
+elif [[ -n "$SERVER_IP_IPV4" ]]; then
+  args+=(--server-override "$SERVER_IP_IPV4" --clash-ipv6 false)
+elif [[ -n "$SERVER_IP_IPV6" ]]; then
+  args+=(--server-override "$SERVER_IP_IPV6" --name-suffix=-IPv6 --clash-ipv6 true)
+fi
+"${args[@]}"
 
 if [[ "$ENABLE_SUBSCRIPTION_SERVER" == "true" ]]; then
   bash "$SCRIPT_DIR/13-setup-subscription.sh"

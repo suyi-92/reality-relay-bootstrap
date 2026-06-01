@@ -178,7 +178,7 @@ $(if [[ -n "$(server_ipv4_hosts)" ]]; then
   printf '\n'
 fi)
 $(if [[ -n "$(server_ipv6_hosts)" ]]; then
-  printf 'IPv6:\n'
+  printf '\nIPv6:\n'
   for host in $(server_ipv6_hosts); do
     printf '  ssh -p %s -o PreferredAuthentications=publickey -o PasswordAuthentication=no %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
     printf '  ssh -p %s root@%s\n' "$SSH_PORT" "$host"

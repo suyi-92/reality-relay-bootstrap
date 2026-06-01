@@ -107,6 +107,18 @@ else
   info "sing-box 可执行文件已就绪：$bin"
 fi
 
+if [[ "$RESET_PROXY_KEYS" == "true" ]]; then
+  info "RESET_PROXY_KEYS=true，将重置 VLESS UUID、Reality keypair 和 short-id。旧节点会失效。"
+  for secret_path in "$VLESS_UUID_PATH" "$REALITY_PRIVATE_KEY_PATH" "$REALITY_PUBLIC_KEY_PATH" "$REALITY_SHORT_ID_PATH"; do
+    [[ -e "$secret_path" ]] && backup_path "$secret_path" || true
+    if is_dry_run; then
+      log "DRY-RUN: rm -f $secret_path"
+    else
+      rm -f "$secret_path"
+    fi
+  done
+fi
+
 if [[ ! -s "$VLESS_UUID_PATH" ]]; then
   info "生成 VLESS UUID 并保存到 $VLESS_UUID_PATH（不会打印 UUID 到日志）。"
   if is_dry_run; then
