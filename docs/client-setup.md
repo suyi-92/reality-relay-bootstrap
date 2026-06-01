@@ -13,13 +13,13 @@
 
 ```bash
 ENABLE_SUBSCRIPTION_SERVER="true"
-SUBSCRIPTION_PORT="51080"
+SUBSCRIPTION_PORT="51040"
 ```
 
 执行 `sudo bash bootstrap.sh --phase output-nodes` 后，Clash/Mihomo 可使用：
 
 ```text
-http://服务器IP:51080/clash.yaml
+http://服务器IP:51040/clash.yaml
 ```
 
 这是无鉴权 HTTP 文件服务，建议只在服务商安全组里放行你的常用来源 IP。

@@ -149,13 +149,15 @@ cat <<EOF
 
 验证完成。Windows PowerShell 建议继续测试：
 
-  Test-NetConnection ${SERVER_IP:-服务器IP} -Port $DIRECT_PORT
-$(for port in "${PORTS[@]}"; do
-  [[ "$port" == "$DIRECT_PORT" ]] && continue
-  printf '  Test-NetConnection %s -Port %s\n' "${SERVER_IP:-服务器IP}" "$port"
+$(for host in $(server_hosts); do
+  for port in "${PORTS[@]}"; do
+    printf '  Test-NetConnection %s -Port %s\n' "$host" "$port"
+  done
 done)
 
-  ssh -p $SSH_PORT -o PreferredAuthentications=publickey -o PasswordAuthentication=no ${ADMIN_USER}@${SERVER_IP:-服务器IP}
-  ssh -p $SSH_PORT root@${SERVER_IP:-服务器IP}
-  ssh -p $SSH_PORT -o PubkeyAuthentication=no -o PreferredAuthentications=password ${ADMIN_USER}@${SERVER_IP:-服务器IP}
+$(for host in $(server_hosts); do
+  printf '  ssh -p %s -o PreferredAuthentications=publickey -o PasswordAuthentication=no %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
+  printf '  ssh -p %s root@%s\n' "$SSH_PORT" "$host"
+  printf '  ssh -p %s -o PubkeyAuthentication=no -o PreferredAuthentications=password %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
+done)
 EOF

@@ -140,7 +140,9 @@ fi
 cat <<EOF
 
 回滚流程完成。建议立刻另开窗口测试 SSH：
-  ssh -p $SSH_PORT ${ADMIN_USER}@${SERVER_IP:-服务器IP}
+$(for host in $(server_hosts); do
+  printf '  ssh -p %s %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
+done)
 
 可选环境变量：
   RESTORE_FULL_SSH_BACKUP=yes      恢复完整 SSH 备份

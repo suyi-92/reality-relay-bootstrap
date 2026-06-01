@@ -30,6 +30,10 @@ def yaml_bool(value: bool) -> str:
 def get_server_ip(env: Dict[str, str]) -> str:
     if env.get("SERVER_IP", "").strip():
         return env["SERVER_IP"].strip()
+    if env.get("SERVER_IP_IPV4", "").strip():
+        return env["SERVER_IP_IPV4"].strip()
+    if env.get("SERVER_IP_IPV6", "").strip():
+        return env["SERVER_IP_IPV6"].strip()
     try:
         proc = subprocess.run(
             ["curl", "-4", "-fsS", "--max-time", "10", "https://ifconfig.me"],
@@ -43,7 +47,7 @@ def get_server_ip(env: Dict[str, str]) -> str:
             return ip
     except Exception:
         pass
-    raise SystemExit("SERVER_IP 为空且无法自动获取公网 IP；请在 config.env 填写 SERVER_IP。")
+    raise SystemExit("SERVER_IP 为空且无法自动获取公网 IP；请在 config.env 填写 SERVER_IP_IPV4 或 SERVER_IP_IPV6。")
 
 
 def build_nodes(env: Dict[str, str], rows: List[Dict[str, Any]], gen) -> List[Dict[str, Any]]:

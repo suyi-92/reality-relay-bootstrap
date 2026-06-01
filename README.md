@@ -53,7 +53,7 @@ reality-relay-bootstrap/
 
 更详细的参数解释、Windows PowerShell 示例、回滚和客户端导入说明，请阅读 [`reality-relay-bootstrap-usage.md`](./reality-relay-bootstrap-usage.md)。
 
-如果是在全新 VPS 上使用推荐默认值部署，可以直接运行一键安装脚本。脚本会自动拉取/定位项目、生成 `config.env` 和 `home-proxies.csv`，只要求你填写 `SERVER_ALIAS`、`SERVER_IP`、`SSH_PORT`、`ADMIN_USER`、一个或多个 `ADMIN_PUBKEY` 以及家宽代理 CSV 内容，其余配置保持安全默认值：
+如果是在全新 VPS 上使用推荐默认值部署，可以直接运行一键安装脚本。脚本会自动拉取/定位项目、生成 `config.env` 和 `home-proxies.csv`，会提示填写服务器 IPv4/IPv6、SSH、入口端口、订阅端口、管理员公钥以及家宽代理 CSV 内容：
 
 ```bash
 bash <(wget -qO- https://raw.githubusercontent.com/suyi-92/reality-relay-bootstrap/main/install.sh)
@@ -97,6 +97,8 @@ sudo bash bootstrap.sh --phase firewall --dry-run
 ```bash
 SERVER_ALIAS="my-vps"
 SERVER_IP="你的服务器公网IP"
+SERVER_IP_IPV4="你的服务器公网IPv4"
+SERVER_IP_IPV6=""
 SSH_PORT="22"
 ADMIN_USER="admin"
 ADMIN_PUBKEY="ssh-ed25519 AAAA... 你的本地公钥"
@@ -258,7 +260,7 @@ sudo cat /root/reality-relay-bootstrap-clash.yaml
 
 ```bash
 ENABLE_SUBSCRIPTION_SERVER="true"
-SUBSCRIPTION_PORT="51080"
+SUBSCRIPTION_PORT="51040"
 ```
 
 然后执行：
@@ -271,8 +273,8 @@ sudo bash bootstrap.sh --phase firewall
 订阅地址：
 
 ```text
-http://服务器IP:51080/clash.yaml
-http://服务器IP:51080/nodes.txt
+http://服务器IP:51040/clash.yaml
+http://服务器IP:51040/nodes.txt
 ```
 
 这是简单 HTTP 文件服务，没有鉴权；建议只在服务商安全组里放行你的常用来源 IP。

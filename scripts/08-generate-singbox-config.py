@@ -129,6 +129,8 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
     d = {
         "SERVER_ALIAS": "my-vps",
         "SERVER_IP": "",
+        "SERVER_IP_IPV4": "",
+        "SERVER_IP_IPV6": "",
         "SSH_PORT": "22",
         "INITIAL_USER": "root",
         "ADMIN_USER": "admin",
@@ -168,6 +170,13 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
     }
     for k, v in d.items():
         merged.setdefault(k, v)
+    server_ip = merged.get("SERVER_IP", "")
+    if server_ip and ":" in server_ip and not merged.get("SERVER_IP_IPV6"):
+        merged["SERVER_IP_IPV6"] = server_ip
+    elif server_ip and ":" not in server_ip and not merged.get("SERVER_IP_IPV4"):
+        merged["SERVER_IP_IPV4"] = server_ip
+    if not merged.get("SERVER_IP"):
+        merged["SERVER_IP"] = merged.get("SERVER_IP_IPV4") or merged.get("SERVER_IP_IPV6") or ""
 
     default_state_dir = "/etc/reality-relay-bootstrap"
     if merged["RRB_STATE_DIR"] != default_state_dir:

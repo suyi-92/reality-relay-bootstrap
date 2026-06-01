@@ -86,6 +86,23 @@ load_config() {
 
   : "${SERVER_ALIAS:=my-vps}"
   : "${SERVER_IP:=}"
+  : "${SERVER_IP_IPV4:=}"
+  : "${SERVER_IP_IPV6:=}"
+  if [[ -n "$SERVER_IP" ]]; then
+    if [[ "$SERVER_IP" == *:* && -z "$SERVER_IP_IPV6" ]]; then
+      SERVER_IP_IPV6="$SERVER_IP"
+    elif [[ "$SERVER_IP" != *:* && -z "$SERVER_IP_IPV4" ]]; then
+      SERVER_IP_IPV4="$SERVER_IP"
+    fi
+  fi
+  if [[ -z "$SERVER_IP" ]]; then
+    if [[ -n "$SERVER_IP_IPV4" ]]; then
+      SERVER_IP="$SERVER_IP_IPV4"
+    elif [[ -n "$SERVER_IP_IPV6" ]]; then
+      SERVER_IP="$SERVER_IP_IPV6"
+    fi
+  fi
+  export SERVER_IP SERVER_IP_IPV4 SERVER_IP_IPV6
   : "${SSH_PORT:=22}"
   : "${INITIAL_USER:=root}"
   : "${ADMIN_USER:=admin}"
@@ -144,11 +161,36 @@ load_config() {
   : "${CLIENT_ALPN:=h2,http/1.1}"
   : "${CLASH_MIXED_PORT:=7890}"
   : "${ENABLE_SUBSCRIPTION_SERVER:=false}"
-  : "${SUBSCRIPTION_PORT:=51080}"
+  : "${SUBSCRIPTION_PORT:=51040}"
   : "${SUBSCRIPTION_DIR:=/etc/reality-relay-bootstrap/subscription}"
 
   validate_config_basics
   resolve_csv_path
+}
+
+server_hosts() {
+  local fallback="${1:-服务器IP}" printed="false"
+  if [[ -n "${SERVER_IP_IPV4:-}" ]]; then
+    printf '%s\n' "$SERVER_IP_IPV4"
+    printed="true"
+  elif [[ -n "${SERVER_IP:-}" ]]; then
+    printf '%s\n' "$SERVER_IP"
+    printed="true"
+  fi
+  if [[ -n "${SERVER_IP_IPV6:-}" ]]; then
+    printf '%s\n' "$SERVER_IP_IPV6"
+    printed="true"
+  fi
+  [[ "$printed" == "true" ]] || printf '%s\n' "$fallback"
+}
+
+url_host() {
+  local host="$1"
+  if [[ "$host" == *:* && "$host" != \[*\] ]]; then
+    printf '[%s]\n' "$host"
+  else
+    printf '%s\n' "$host"
+  fi
 }
 
 validate_bool() {
@@ -190,9 +232,11 @@ validate_config_basics() {
   [[ "$PROXY_IP_VERSION" == "ipv4" || "$PROXY_IP_VERSION" == "ipv6" || "$PROXY_IP_VERSION" == "dual" ]] || die "PROXY_IP_VERSION 只能是 ipv4、ipv6 或 dual"
   validate_port REALITY_HANDSHAKE_PORT
   validate_port SUBSCRIPTION_PORT
-  [[ "$SUBSCRIPTION_PORT" != "$SSH_PORT" ]] || die "SUBSCRIPTION_PORT 不能与 SSH_PORT 相同"
-  [[ "$SUBSCRIPTION_PORT" != "$DIRECT_PORT" ]] || die "SUBSCRIPTION_PORT 不能与 DIRECT_PORT 相同"
-  (( SUBSCRIPTION_PORT < HOME_PORT_START || SUBSCRIPTION_PORT > HOME_PORT_END )) || die "SUBSCRIPTION_PORT 不能落在 HOME_PORT_START/HOME_PORT_END 范围内"
+  if [[ "$ENABLE_SUBSCRIPTION_SERVER" == "true" ]]; then
+    [[ "$SUBSCRIPTION_PORT" != "$SSH_PORT" ]] || die "SUBSCRIPTION_PORT 不能与 SSH_PORT 相同"
+    [[ "$SUBSCRIPTION_PORT" != "$DIRECT_PORT" ]] || die "SUBSCRIPTION_PORT 不能与 DIRECT_PORT 相同"
+    (( SUBSCRIPTION_PORT < HOME_PORT_START || SUBSCRIPTION_PORT > HOME_PORT_END )) || die "SUBSCRIPTION_PORT 不能落在 HOME_PORT_START/HOME_PORT_END 范围内"
+  fi
   [[ "$SUBSCRIPTION_DIR" == /* ]] || die "SUBSCRIPTION_DIR 必须是绝对路径"
   [[ "$SUBSCRIPTION_DIR" =~ ^/[A-Za-z0-9._/-]+$ ]] || die "SUBSCRIPTION_DIR 只能包含英文、数字、点、下划线、短横线和斜杠"
   [[ "$VLESS_FLOW" == "" || "$VLESS_FLOW" == "xtls-rprx-vision" ]] || die "VLESS_FLOW 目前建议为空或 xtls-rprx-vision，当前：$VLESS_FLOW"

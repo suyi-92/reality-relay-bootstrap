@@ -65,8 +65,11 @@ cat <<EOF
 
 订阅服务已配置：
 
-  Clash/Mihomo:  http://${SERVER_IP:-服务器IP}:$SUBSCRIPTION_PORT/clash.yaml
-  节点文本:      http://${SERVER_IP:-服务器IP}:$SUBSCRIPTION_PORT/nodes.txt
+$(for host in $(server_hosts); do
+  h="$(url_host "$host")"
+  printf '  Clash/Mihomo:  http://%s:%s/clash.yaml\n' "$h" "$SUBSCRIPTION_PORT"
+  printf '  节点文本:      http://%s:%s/nodes.txt\n' "$h" "$SUBSCRIPTION_PORT"
+done)
 
 请确认 UFW 和服务商安全组放行 tcp/$SUBSCRIPTION_PORT。
 EOF

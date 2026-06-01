@@ -70,11 +70,16 @@ sudo bash install.sh
 
 | 需要填写 | 默认值/提示 | 说明 |
 |---|---|---|
-| `SERVER_ALIAS` | `my-vps` | 服务器别名，也会作为 443 节点名称 |
-| `SERVER_IP` | 自动探测公网 IPv4，失败时为空 | 服务器公网 IP |
+| `SERVER_ALIAS` | 空 | 服务器别名，也会作为 443 节点名称 |
+| `SERVER_IP_IPv4` | 自动探测公网 IPv4，失败时为空 | 服务器公网 IPv4 |
+| `SERVER_IP_IPv6` | 空 | 服务器公网 IPv6，可不填 |
 | `SSH_PORT` | `22` | 当前 SSH 端口 |
 | `ADMIN_USER` | `admin` | 新建管理用户 |
-| `ADMIN_PUBKEY` | `/root/.ssh/authorized_keys` 中已有公钥会逐条弹出，若存在 | 本地 SSH 公钥，可填写多个 |
+| `DIRECT_PORT` | `443` | VLESS+Reality 直连入口端口 |
+| `ENABLE_SUBSCRIPTION_SERVER` | `true` | 是否开启简单订阅端口 |
+| `SUBSCRIPTION_PORT` | `51040` | 订阅端口；仅开启订阅服务时询问 |
+| `HOME_PORT_START` / `HOME_PORT_END` | `51043` / `51060` | 家宽入口端口范围 |
+| `ADMIN_PUBKEY` | 空回车结束 | 本地 SSH 公钥，可填写多个 |
 | `home-proxies.csv` | 可逐条提示，也可一次性粘贴多行 CSV | 家宽出口列表；字段顺序同模板 |
 
 注意事项：
@@ -203,6 +208,8 @@ nano config.env
 ```bash
 SERVER_ALIAS="my-vps"
 SERVER_IP="1.2.3.4"
+SERVER_IP_IPV4="1.2.3.4"
+SERVER_IP_IPV6=""
 SSH_PORT="22"
 INITIAL_USER="root"
 ADMIN_USER="admin"
@@ -255,7 +262,9 @@ CLASH_MIXED_PORT="7890"
 | 变量 | 说明 | 示例 |
 |---|---|---|
 | `SERVER_ALIAS` | 服务器别名；会作为 443/direct 或 443/smart 节点名称 | `my-vps` |
-| `SERVER_IP` | 服务器公网 IP，建议必填 | `1.2.3.4` |
+| `SERVER_IP` | 兼容字段；默认写入 IPv4，IPv4 为空时写入 IPv6 | `1.2.3.4` |
+| `SERVER_IP_IPV4` | 服务器公网 IPv4 | `1.2.3.4` |
+| `SERVER_IP_IPV6` | 服务器公网 IPv6，可为空 | `2001:db8::1` |
 | `SSH_PORT` | 当前 SSH 端口 | `22` |
 | `INITIAL_USER` | 服务商初始用户；当前仅作为预留/记录字段，实际 SSH 登录仍由你手动完成 | `root` |
 | `ADMIN_USER` | 新建管理用户 | `admin` |
@@ -786,7 +795,7 @@ sudo cat /root/reality-relay-bootstrap-clash.yaml
 
 ```bash
 ENABLE_SUBSCRIPTION_SERVER="true"
-SUBSCRIPTION_PORT="51080"
+SUBSCRIPTION_PORT="51040"
 ```
 
 然后执行：
@@ -799,8 +808,8 @@ sudo bash bootstrap.sh --phase firewall
 订阅地址：
 
 ```text
-http://服务器IP:51080/clash.yaml
-http://服务器IP:51080/nodes.txt
+http://服务器IP:51040/clash.yaml
+http://服务器IP:51040/nodes.txt
 ```
 
 该端口是无鉴权 HTTP 文件服务，建议只在服务商安全组里放行你的常用来源 IP。

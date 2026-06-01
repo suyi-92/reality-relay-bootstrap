@@ -46,5 +46,7 @@ $(if [[ "$ENABLE_SUBSCRIPTION_SERVER" == "true" ]]; then printf '  Subscription:
 
 不要无脑开放 ${HOME_PORT_START}:${HOME_PORT_END}，除非你确认所有端口都会使用。
 启用 UFW 后请另开窗口测试 SSH：
-  ssh -p $SSH_PORT ${ADMIN_USER}@${SERVER_IP:-服务器IP}
+$(for host in $(server_hosts); do
+  printf '  ssh -p %s %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
+done)
 EOF

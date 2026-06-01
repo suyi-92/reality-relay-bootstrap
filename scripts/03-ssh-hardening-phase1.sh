@@ -26,7 +26,9 @@ cat <<EOF
 SSH phase1 已完成；当前仍未禁用 root/密码登录。
 
 请保留当前 SSH 窗口，另开一个新的 Windows PowerShell 测试 admin key 登录：
-  ssh -p $SSH_PORT -o PreferredAuthentications=publickey -o PasswordAuthentication=no ${ADMIN_USER}@${SERVER_IP:-服务器IP}
+$(for host in $(server_hosts); do
+  printf '  ssh -p %s -o PreferredAuthentications=publickey -o PasswordAuthentication=no %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
+done)
 
 登录成功后在新窗口执行：
   whoami
