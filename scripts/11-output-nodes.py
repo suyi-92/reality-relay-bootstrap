@@ -116,6 +116,17 @@ def build_nodes(env: Dict[str, str], rows: List[Dict[str, Any]], gen, server_ove
     return nodes
 
 
+def interleave_nodes(primary: List[Dict[str, Any]], secondary: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    nodes: List[Dict[str, Any]] = []
+    longest = max(len(primary), len(secondary))
+    for index in range(longest):
+        if index < len(primary):
+            nodes.append(primary[index])
+        if index < len(secondary):
+            nodes.append(secondary[index])
+    return nodes
+
+
 def node_to_text(node: Dict[str, Any]) -> str:
     alpn = ",".join(node["alpn"])
     lines = [
@@ -262,7 +273,8 @@ def main() -> int:
     rows = gen.load_rows(env, env_path.parent, allow_empty=True)
     nodes = build_nodes(env, rows, gen, args.server_override, args.name_suffix)
     if args.extra_server:
-        nodes.extend(build_nodes(env, rows, gen, args.extra_server, args.extra_name_suffix))
+        extra_nodes = build_nodes(env, rows, gen, args.extra_server, args.extra_name_suffix)
+        nodes = interleave_nodes(nodes, extra_nodes)
 
     nodes_text = "\n---\n".join(node_to_text(node) for node in nodes) + "\n"
     clash_yaml = build_clash_yaml(env, nodes, args.clash_ipv6)
