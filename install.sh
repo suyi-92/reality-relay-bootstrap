@@ -245,6 +245,10 @@ CLIENT_FINGERPRINT="chrome"
 CLIENT_UDP="false"
 CLIENT_ALPN="h2,http/1.1"
 CLASH_MIXED_PORT="7890"
+
+ENABLE_SUBSCRIPTION_SERVER="false"
+SUBSCRIPTION_PORT="51080"
+SUBSCRIPTION_DIR="/etc/reality-relay-bootstrap/subscription"
 EOF_CONFIG
   chmod 600 "$project_dir/config.env"
 }

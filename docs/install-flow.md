@@ -60,6 +60,8 @@ sudo bash bootstrap.sh --phase firewall
 
 UFW 只放行 SSH、`DIRECT_PORT`、CSV 中实际 `listen_port`。服务商安全组也要手动放行同样端口。
 
+如果 `ENABLE_SUBSCRIPTION_SERVER=true`，还会放行 `SUBSCRIPTION_PORT`，默认是 `51080`。
+
 ## 6. 验证
 
 ```bash

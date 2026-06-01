@@ -24,6 +24,10 @@ for port in "${PORTS[@]}"; do
   run ufw allow "${port}/tcp" comment "reality-relay-bootstrap sing-box VLESS+Reality ${port}"
 done
 
+if [[ "$ENABLE_SUBSCRIPTION_SERVER" == "true" ]]; then
+  info "准备开放订阅 HTTP 端口：$SUBSCRIPTION_PORT"
+  run ufw allow "${SUBSCRIPTION_PORT}/tcp" comment "reality-relay-bootstrap subscription ${SUBSCRIPTION_PORT}"
+fi
 
 if is_dry_run; then
   log "DRY-RUN: ufw --force enable && ufw status verbose"
@@ -38,6 +42,7 @@ UFW 已按最小端口开放。服务商安全组/云防火墙也必须手动放
 
   SSH:        tcp/$SSH_PORT
 $(printf '  VLESS+Reality:     tcp/%s\n' "${PORTS[@]}")
+$(if [[ "$ENABLE_SUBSCRIPTION_SERVER" == "true" ]]; then printf '  Subscription:       tcp/%s\n' "$SUBSCRIPTION_PORT"; fi)
 
 不要无脑开放 ${HOME_PORT_START}:${HOME_PORT_END}，除非你确认所有端口都会使用。
 启用 UFW 后请另开窗口测试 SSH：

@@ -38,6 +38,7 @@ reality-relay-bootstrap/
     11-output-nodes.py
     11-output-nodes-wrapper.sh
     12-rollback.sh
+    13-setup-subscription.sh
   templates/
     sshd-hardening.conf.tpl
     fail2ban-sshd.local.tpl
@@ -250,6 +251,29 @@ sudo cat /root/reality-relay-bootstrap-nodes.txt
 sudo cat /root/reality-relay-bootstrap-clash.yaml
 ```
 
+如果只想开一个简单订阅端口，在 `config.env` 设置：
+
+```bash
+ENABLE_SUBSCRIPTION_SERVER="true"
+SUBSCRIPTION_PORT="51080"
+```
+
+然后执行：
+
+```bash
+sudo bash bootstrap.sh --phase output-nodes
+sudo bash bootstrap.sh --phase firewall
+```
+
+订阅地址：
+
+```text
+http://服务器IP:51080/clash.yaml
+http://服务器IP:51080/nodes.txt
+```
+
+这是简单 HTTP 文件服务，没有鉴权；建议只在服务商安全组里放行你的常用来源 IP。
+
 输出节点包括：
 
 - 443 节点使用 `SERVER_ALIAS`，例如 `my-vps`
@@ -284,6 +308,7 @@ alpn:
 SSH:        tcp/$SSH_PORT
 VLESS:      tcp/$DIRECT_PORT
 VLESS:      tcp/CSV 中每个 listen_port
+订阅:       tcp/$SUBSCRIPTION_PORT（仅 ENABLE_SUBSCRIPTION_SERVER=true）
 ```
 
 服务商安全组/云防火墙也必须手动放行同样端口。

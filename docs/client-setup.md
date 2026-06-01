@@ -9,6 +9,21 @@
 
 两个文件包含 VLESS UUID、Reality public key、short-id 等节点信息，权限为 600，不要公开。
 
+如果开启简单订阅端口：
+
+```bash
+ENABLE_SUBSCRIPTION_SERVER="true"
+SUBSCRIPTION_PORT="51080"
+```
+
+执行 `sudo bash bootstrap.sh --phase output-nodes` 后，Clash/Mihomo 可使用：
+
+```text
+http://服务器IP:51080/clash.yaml
+```
+
+这是无鉴权 HTTP 文件服务，建议只在服务商安全组里放行你的常用来源 IP。
+
 ## Clash/Mihomo 节点字段
 
 每个节点类似：

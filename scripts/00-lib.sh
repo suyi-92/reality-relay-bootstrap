@@ -142,6 +142,9 @@ load_config() {
   : "${CLIENT_UDP:=false}"
   : "${CLIENT_ALPN:=h2,http/1.1}"
   : "${CLASH_MIXED_PORT:=7890}"
+  : "${ENABLE_SUBSCRIPTION_SERVER:=false}"
+  : "${SUBSCRIPTION_PORT:=51080}"
+  : "${SUBSCRIPTION_DIR:=/etc/reality-relay-bootstrap/subscription}"
 
   validate_config_basics
   resolve_csv_path
@@ -176,6 +179,7 @@ validate_config_basics() {
   validate_bool ADMIN_SUDO_NOPASSWD
   validate_bool REJECT_CN_PRIVATE
   validate_bool CLIENT_UDP
+  validate_bool ENABLE_SUBSCRIPTION_SERVER
   validate_user_name ADMIN_USER
   validate_user_name SFTP_USER
   (( HOME_PORT_START <= HOME_PORT_END )) || die "HOME_PORT_START 不能大于 HOME_PORT_END"
@@ -183,6 +187,12 @@ validate_config_basics() {
   [[ "$INSTALL_SINGBOX_METHOD" == "apt" || "$INSTALL_SINGBOX_METHOD" == "233boy" ]] || die "INSTALL_SINGBOX_METHOD 只能是 apt 或 233boy"
   [[ "$PROXY_PROTOCOL" == "vless-reality" ]] || die "PROXY_PROTOCOL 当前只支持 vless-reality"
   validate_port REALITY_HANDSHAKE_PORT
+  validate_port SUBSCRIPTION_PORT
+  [[ "$SUBSCRIPTION_PORT" != "$SSH_PORT" ]] || die "SUBSCRIPTION_PORT 不能与 SSH_PORT 相同"
+  [[ "$SUBSCRIPTION_PORT" != "$DIRECT_PORT" ]] || die "SUBSCRIPTION_PORT 不能与 DIRECT_PORT 相同"
+  (( SUBSCRIPTION_PORT < HOME_PORT_START || SUBSCRIPTION_PORT > HOME_PORT_END )) || die "SUBSCRIPTION_PORT 不能落在 HOME_PORT_START/HOME_PORT_END 范围内"
+  [[ "$SUBSCRIPTION_DIR" == /* ]] || die "SUBSCRIPTION_DIR 必须是绝对路径"
+  [[ "$SUBSCRIPTION_DIR" =~ ^/[A-Za-z0-9._/-]+$ ]] || die "SUBSCRIPTION_DIR 只能包含英文、数字、点、下划线、短横线和斜杠"
   [[ "$VLESS_FLOW" == "" || "$VLESS_FLOW" == "xtls-rprx-vision" ]] || die "VLESS_FLOW 目前建议为空或 xtls-rprx-vision，当前：$VLESS_FLOW"
   [[ "$REALITY_SERVER_NAME" =~ ^[A-Za-z0-9._-]+$ ]] || die "REALITY_SERVER_NAME 不合法：$REALITY_SERVER_NAME"
   [[ "$REALITY_HANDSHAKE_SERVER" =~ ^[A-Za-z0-9._-]+$ ]] || die "REALITY_HANDSHAKE_SERVER 不合法：$REALITY_HANDSHAKE_SERVER"

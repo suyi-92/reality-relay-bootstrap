@@ -16,3 +16,7 @@ python3 "$SCRIPT_DIR/11-output-nodes.py" \
   --generator "$SCRIPT_DIR/08-generate-singbox-config.py" \
   --nodes-out /root/reality-relay-bootstrap-nodes.txt \
   --clash-out /root/reality-relay-bootstrap-clash.yaml
+
+if [[ "$ENABLE_SUBSCRIPTION_SERVER" == "true" ]]; then
+  bash "$SCRIPT_DIR/13-setup-subscription.sh"
+fi

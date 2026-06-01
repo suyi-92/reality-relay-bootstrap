@@ -22,6 +22,7 @@ Phases:
   ssh-final       二阶段 SSH 最终加固；必须 CONFIRM_ADMIN_KEY_LOGIN=yes
   fail2ban        安装并配置 fail2ban
   singbox         安装 sing-box、生成 VLESS+Reality 多入口配置并重启
+  subscription    安装/更新可选订阅端口
   firewall        安装/配置 UFW，只开放 SSH、443 和 CSV 实际端口
   validate        验证 SSH、fail2ban、UFW、sing-box、监听端口和家宽代理
   output-nodes    生成 /root/reality-relay-bootstrap-nodes.txt 与 /root/reality-relay-bootstrap-clash.yaml
@@ -65,6 +66,7 @@ case "$PHASE" in
   firewall) run_phase 09-apply-firewall.sh ;;
   validate) run_phase 10-validate.sh ;;
   output-nodes) run_phase 11-output-nodes-wrapper.sh ;;
+  subscription) run_phase 13-setup-subscription.sh ;;
   rollback) run_phase 12-rollback.sh ;;
   *) echo "Unknown phase: $PHASE" >&2; usage >&2; exit 2 ;;
 esac

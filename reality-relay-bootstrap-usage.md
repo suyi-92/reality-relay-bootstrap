@@ -19,6 +19,7 @@ singbox        -> 安装 sing-box，生成 VLESS+Reality 多入口/多出口配�
 firewall       -> 安装/配置 UFW，只开放实际使用端口
 validate       -> 验证 SSH、fail2ban、UFW、sing-box、监听端口、家宽代理
 output-nodes   -> 生成客户端节点文件
+subscription   -> 单独安装/更新简单订阅端口
 rollback       -> 回滚 SSH 加固、sing-box 配置，可选处理 UFW
 ```
 
@@ -770,6 +771,29 @@ sudo bash bootstrap.sh --phase output-nodes
 sudo cat /root/reality-relay-bootstrap-nodes.txt
 sudo cat /root/reality-relay-bootstrap-clash.yaml
 ```
+
+如需简单订阅端口，在 `config.env` 开启：
+
+```bash
+ENABLE_SUBSCRIPTION_SERVER="true"
+SUBSCRIPTION_PORT="51080"
+```
+
+然后执行：
+
+```bash
+sudo bash bootstrap.sh --phase output-nodes
+sudo bash bootstrap.sh --phase firewall
+```
+
+订阅地址：
+
+```text
+http://服务器IP:51080/clash.yaml
+http://服务器IP:51080/nodes.txt
+```
+
+该端口是无鉴权 HTTP 文件服务，建议只在服务商安全组里放行你的常用来源 IP。
 
 ---
 
