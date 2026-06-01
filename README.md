@@ -114,6 +114,7 @@ MODE_443="direct"
 
 ```bash
 PROXY_PROTOCOL="vless-reality"
+PROXY_IP_VERSION="ipv4"
 RRB_STATE_DIR="/etc/reality-relay-bootstrap"
 VLESS_UUID_PATH="/etc/reality-relay-bootstrap/vless-uuid.txt"
 VLESS_FLOW="xtls-rprx-vision"
@@ -128,6 +129,8 @@ CLIENT_FINGERPRINT="chrome"
 CLIENT_UDP="false"
 CLIENT_ALPN="h2,http/1.1"
 ```
+
+`PROXY_IP_VERSION` 可选 `ipv4`、`ipv6`、`dual`；默认 `ipv4`。`dual` 表示双栈可用并优先 IPv4。
 
 首次执行 `--phase singbox` 会自动生成：
 

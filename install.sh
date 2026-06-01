@@ -228,6 +228,7 @@ RRB_STATE_DIR="/etc/reality-relay-bootstrap"
 SINGBOX_CONFIG_PATH="/etc/sing-box/config.json"
 
 PROXY_PROTOCOL="vless-reality"
+PROXY_IP_VERSION="ipv4"
 VLESS_UUID_PATH="/etc/reality-relay-bootstrap/vless-uuid.txt"
 VLESS_FLOW="xtls-rprx-vision"
 REALITY_PRIVATE_KEY_PATH="/etc/reality-relay-bootstrap/reality-private.key"

@@ -230,6 +230,7 @@ RRB_STATE_DIR="/etc/reality-relay-bootstrap"
 SINGBOX_CONFIG_PATH="/etc/sing-box/config.json"
 
 PROXY_PROTOCOL="vless-reality"
+PROXY_IP_VERSION="ipv4"
 VLESS_UUID_PATH="/etc/reality-relay-bootstrap/vless-uuid.txt"
 VLESS_FLOW="xtls-rprx-vision"
 REALITY_PRIVATE_KEY_PATH="/etc/reality-relay-bootstrap/reality-private.key"
@@ -409,6 +410,7 @@ RRB_STATE_DIR="/etc/reality-relay-bootstrap"
 
 ```bash
 PROXY_PROTOCOL="vless-reality"
+PROXY_IP_VERSION="ipv4"
 VLESS_UUID_PATH="/etc/reality-relay-bootstrap/vless-uuid.txt"
 VLESS_FLOW="xtls-rprx-vision"
 REALITY_PRIVATE_KEY_PATH="/etc/reality-relay-bootstrap/reality-private.key"
@@ -419,6 +421,14 @@ REALITY_HANDSHAKE_SERVER="www.microsoft.com"
 REALITY_HANDSHAKE_PORT="443"
 REALITY_MAX_TIME_DIFFERENCE="1m"
 ```
+
+`PROXY_IP_VERSION` 控制代理解析/出站 IP 版本：
+
+| 值 | 说明 |
+|---|---|
+| `ipv4` | 只走 IPv4，默认值 |
+| `ipv6` | 只走 IPv6 |
+| `dual` | IPv4/IPv6 双栈，优先 IPv4 |
 
 首次执行 `singbox` 阶段时会自动生成：
 

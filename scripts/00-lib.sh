@@ -106,6 +106,7 @@ load_config() {
   : "${USE_233BOY_INSTALLER:=false}"
   : "${INSTALL_SINGBOX_METHOD:=apt}"
   : "${PROXY_PROTOCOL:=vless-reality}"
+  : "${PROXY_IP_VERSION:=ipv4}"
   : "${MODE_443:=direct}"
   : "${DIRECT_PORT:=443}"
   : "${HOME_PORT_START:=51043}"
@@ -186,6 +187,7 @@ validate_config_basics() {
   [[ "$MODE_443" == "direct" || "$MODE_443" == "smart" ]] || die "MODE_443 只能是 direct 或 smart"
   [[ "$INSTALL_SINGBOX_METHOD" == "apt" || "$INSTALL_SINGBOX_METHOD" == "233boy" ]] || die "INSTALL_SINGBOX_METHOD 只能是 apt 或 233boy"
   [[ "$PROXY_PROTOCOL" == "vless-reality" ]] || die "PROXY_PROTOCOL 当前只支持 vless-reality"
+  [[ "$PROXY_IP_VERSION" == "ipv4" || "$PROXY_IP_VERSION" == "ipv6" || "$PROXY_IP_VERSION" == "dual" ]] || die "PROXY_IP_VERSION 只能是 ipv4、ipv6 或 dual"
   validate_port REALITY_HANDSHAKE_PORT
   validate_port SUBSCRIPTION_PORT
   [[ "$SUBSCRIPTION_PORT" != "$SSH_PORT" ]] || die "SUBSCRIPTION_PORT 不能与 SSH_PORT 相同"

@@ -139,6 +139,7 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
         "USE_233BOY_INSTALLER": "false",
         "INSTALL_SINGBOX_METHOD": "apt",
         "PROXY_PROTOCOL": "vless-reality",
+        "PROXY_IP_VERSION": "ipv4",
         "MODE_443": "direct",
         "DIRECT_PORT": "443",
         "HOME_PORT_START": "51043",
@@ -217,6 +218,8 @@ def validate_env(env: Dict[str, str]) -> None:
         raise ConfigError("HOME_PORT_START 不能大于 HOME_PORT_END")
     if env["PROXY_PROTOCOL"] != "vless-reality":
         raise ConfigError("PROXY_PROTOCOL 当前只支持 vless-reality")
+    if env["PROXY_IP_VERSION"] not in {"ipv4", "ipv6", "dual"}:
+        raise ConfigError("PROXY_IP_VERSION 只能是 ipv4、ipv6 或 dual")
     if env["MODE_443"] not in {"direct", "smart"}:
         raise ConfigError("MODE_443 只能是 direct 或 smart")
     if not env["SERVER_ALIAS"].strip():
@@ -450,6 +453,15 @@ def select_ai_outbound(env: Dict[str, str], rows: List[Dict[str, Any]]) -> Tuple
     return "direct", "direct"
 
 
+def dns_strategy(env: Dict[str, str]) -> str:
+    strategies = {
+        "ipv4": "ipv4_only",
+        "ipv6": "ipv6_only",
+        "dual": "prefer_ipv4",
+    }
+    return strategies[env["PROXY_IP_VERSION"]]
+
+
 def build_config(env: Dict[str, str], rows: List[Dict[str, Any]], uuid: str, private_key: str, short_id: str) -> Dict[str, Any]:
     direct_port = as_port(env, "DIRECT_PORT")
     direct_inbound_tag = "vless-direct-443" if env["MODE_443"] == "direct" else "vless-smart-443"
@@ -517,7 +529,7 @@ def build_config(env: Dict[str, str], rows: List[Dict[str, Any]], uuid: str, pri
                 },
             ],
             "final": "dns-cloudflare",
-            "strategy": "ipv4_only",
+            "strategy": dns_strategy(env),
             "cache_capacity": 4096,
         },
         "inbounds": inbounds,
@@ -575,6 +587,7 @@ def node_list(env: Dict[str, str], rows: List[Dict[str, Any]]) -> List[Dict[str,
 def print_summary(env: Dict[str, str], rows: List[Dict[str, Any]]) -> None:
     print("配置检查通过。")
     print("入站协议：VLESS + Reality")
+    print(f"代理 IP 版本：{env['PROXY_IP_VERSION']}（DNS strategy: {dns_strategy(env)}）")
     print(f"443 模式：{env['MODE_443']}，端口：{env['DIRECT_PORT']}")
     print(f"Reality server_name：{env['REALITY_SERVER_NAME']}")
     print(f"Reality handshake：{env['REALITY_HANDSHAKE_SERVER']}:{env['REALITY_HANDSHAKE_PORT']}")

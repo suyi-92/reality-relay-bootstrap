@@ -106,12 +106,13 @@ def node_to_text(node: Dict[str, Any]) -> str:
 
 def build_clash_yaml(env: Dict[str, str], nodes: List[Dict[str, Any]]) -> str:
     names = [node["name"] for node in nodes]
+    ipv6_enabled = env["PROXY_IP_VERSION"] in {"ipv6", "dual"}
     lines = [
         f"mixed-port: {env['CLASH_MIXED_PORT']}",
         "allow-lan: false",
         "mode: rule",
         "log-level: info",
-        "ipv6: false",
+        f"ipv6: {yaml_bool(ipv6_enabled)}",
         "",
         "proxies:",
     ]
