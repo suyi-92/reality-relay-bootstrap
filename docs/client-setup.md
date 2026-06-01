@@ -20,7 +20,7 @@ SUBSCRIPTION_TARGET="ClashMeta"
 执行 `sudo bash bootstrap.sh --phase output-nodes` 后，Clash/Mihomo 可使用：
 
 ```text
-http://服务器IP:51040/sub/<VLESS_UUID>?target=ClashMeta
+http://服务器IP:51040/sub/<VLESS_UUID>/ClashMeta
 ```
 
 `<VLESS_UUID>` 来自 `/etc/reality-relay-bootstrap/vless-uuid.txt`。内置订阅服务是 HTTP；如需 HTTPS，请在外层接入带证书的反向代理。

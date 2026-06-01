@@ -277,7 +277,7 @@ sudo bash bootstrap.sh --phase firewall
 订阅地址：
 
 ```text
-http://服务器IP:51040/sub/<VLESS_UUID>?target=ClashMeta
+http://服务器IP:51040/sub/<VLESS_UUID>/ClashMeta
 ```
 
 内置服务是 HTTP，URL 里的 token 使用 `/etc/reality-relay-bootstrap/vless-uuid.txt`。仍建议只在服务商安全组里放行你的常用来源 IP。

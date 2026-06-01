@@ -61,6 +61,8 @@ def read_token(token_file: Path) -> str:
 def split_token_and_target(raw_tail: str, query: str, default_target: str) -> Tuple[str, str]:
     token = raw_tail
     path_target = ""
+    if "/" in token:
+        token, path_target = token.split("/", 1)
     if "&" in raw_tail:
         token, rest = raw_tail.split("&", 1)
         for part in rest.split("&"):
@@ -70,7 +72,7 @@ def split_token_and_target(raw_tail: str, query: str, default_target: str) -> Tu
                 break
     qs = parse_qs(query, keep_blank_values=True)
     query_target = (qs.get("target") or [""])[0]
-    return unquote(token), normalize_target(query_target or path_target or default_target)
+    return unquote(token), normalize_target(unquote(query_target or path_target or default_target))
 
 
 def build_handler(root: Path, token_file: Path, default_target: str):
@@ -83,7 +85,7 @@ def build_handler(root: Path, token_file: Path, default_target: str):
         def do_GET(self) -> None:
             split = urlsplit(self.path)
             if split.path == "/":
-                self.send_body(200, b"subscription path: /sub/<token>?target=ClashMeta\n", "text/plain; charset=utf-8")
+                self.send_body(200, b"subscription path: /sub/<token>/ClashMeta\n", "text/plain; charset=utf-8")
                 return
             if not split.path.startswith("/sub/"):
                 self.send_body(404, b"not found\n", "text/plain; charset=utf-8")

@@ -422,7 +422,7 @@ run_install_flow() {
     printf '\nIPv6:\n'
     printf '  ssh -p %q -o PreferredAuthentications=publickey -o PasswordAuthentication=no %q@%q\n' "$ssh_port" "$admin_user" "$server_ip_ipv6"
   fi
-  printf '  whoami && sudo whoami\n\n'
+  printf '\n  whoami && sudo whoami\n\n'
   printf '确认输出包含 %q 和 root 后，再回到这里继续。\n' "$admin_user"
   if read_yes_no "我已确认 admin 公钥登录和 sudo 正常，继续 SSH final 加固？" no; then
     CONFIRM_ADMIN_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final
@@ -444,7 +444,7 @@ run_install_flow() {
     local token target_label target_path
     token="$(subscription_token)"
     target_label="$(subscription_target_label "$subscription_target")"
-    target_path="/sub/${token}?target=${subscription_target}"
+    target_path="/sub/${token}/${subscription_target}"
     printf '\n订阅链接：\n'
     if [[ -n "$server_ip_ipv4" ]]; then
       local h4
