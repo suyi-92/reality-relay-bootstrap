@@ -13,12 +13,10 @@ SERVER_INSTALL_PATH="$SERVER_INSTALL_DIR/subscription-server.py"
 
 subscription_target_file() {
   case "$SUBSCRIPTION_TARGET" in
-    mihomo) printf 'mihomo.yaml\n' ;;
-    v2ray) printf 'v2ray.txt\n' ;;
-    shadowsocks) printf 'shadowsocks.txt\n' ;;
-    ssr) printf 'ssr.txt\n' ;;
-    quantumultx) printf 'quantumultx.txt\n' ;;
-    shadowrocket) printf 'shadowrocket.txt\n' ;;
+    ClashMeta) printf 'clashmeta.yaml\n' ;;
+    V2Ray) printf 'v2ray.txt\n' ;;
+    QX) printf 'qx.txt\n' ;;
+    ShadowRocket) printf 'shadowrocket.txt\n' ;;
     *) die "SUBSCRIPTION_TARGET 不支持：$SUBSCRIPTION_TARGET" ;;
   esac
 }
@@ -42,13 +40,7 @@ else
   chmod 700 "$SUBSCRIPTION_DIR" "$SUBSCRIPTION_DIR/all"
   install -m 0755 -o root -g root "$SCRIPT_DIR/13-subscription-server.py" "$SERVER_INSTALL_PATH"
 
-  rm -f \
-    "$SUBSCRIPTION_DIR/all/mihomo.yaml" \
-    "$SUBSCRIPTION_DIR/all/v2ray.txt" \
-    "$SUBSCRIPTION_DIR/all/shadowsocks.txt" \
-    "$SUBSCRIPTION_DIR/all/ssr.txt" \
-    "$SUBSCRIPTION_DIR/all/quantumultx.txt" \
-    "$SUBSCRIPTION_DIR/all/shadowrocket.txt"
+  rm -f "$SUBSCRIPTION_DIR/all/"*.yaml "$SUBSCRIPTION_DIR/all/"*.txt
 
   target_file="$(subscription_target_file)"
   args=(

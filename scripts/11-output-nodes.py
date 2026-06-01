@@ -15,12 +15,10 @@ from urllib.parse import quote, urlencode
 
 
 SUBSCRIPTION_TARGETS = {
-    "mihomo",
-    "v2ray",
-    "shadowsocks",
-    "ssr",
-    "quantumultx",
-    "shadowrocket",
+    "ClashMeta",
+    "V2Ray",
+    "QX",
+    "ShadowRocket",
 }
 
 
@@ -41,16 +39,19 @@ def yaml_bool(value: bool) -> str:
 
 
 def normalize_subscription_target(value: str) -> str:
-    compact = re.sub(r"[\s_-]+", "", (value or "mihomo").lower())
+    compact = re.sub(r"[\s_-]+", "", (value or "ClashMeta").lower())
     aliases = {
-        "clash": "mihomo",
-        "clashmeta": "mihomo",
-        "v2rayn": "v2ray",
-        "v2rayng": "v2ray",
-        "ss": "shadowsocks",
-        "shadowsocksr": "ssr",
-        "quanx": "quantumultx",
-        "quantumult": "quantumultx",
+        "mihomo": "ClashMeta",
+        "clash": "ClashMeta",
+        "clashmeta": "ClashMeta",
+        "v2ray": "V2Ray",
+        "v2rayn": "V2Ray",
+        "v2rayng": "V2Ray",
+        "qx": "QX",
+        "quanx": "QX",
+        "quantumult": "QX",
+        "quantumultx": "QX",
+        "shadowrocket": "ShadowRocket",
     }
     target = aliases.get(compact, compact)
     if target not in SUBSCRIPTION_TARGETS:
@@ -238,9 +239,9 @@ def build_uri_subscription(nodes: List[Dict[str, Any]], *, base64_encode: bool) 
 
 def build_subscription_payload(target: str, clash_yaml: str, nodes: List[Dict[str, Any]]) -> str:
     target = normalize_subscription_target(target)
-    if target == "mihomo":
+    if target == "ClashMeta":
         return clash_yaml
-    if target == "v2ray":
+    if target == "V2Ray":
         return build_uri_subscription(nodes, base64_encode=True)
     return build_uri_subscription(nodes, base64_encode=False)
 
@@ -289,7 +290,7 @@ def main() -> int:
         os.chmod(path, 0o600)
 
     if args.subscription_out:
-        target = normalize_subscription_target(args.subscription_target or env.get("SUBSCRIPTION_TARGET", "mihomo"))
+        target = normalize_subscription_target(args.subscription_target or env.get("SUBSCRIPTION_TARGET", "ClashMeta"))
         subscription_payload = build_subscription_payload(target, clash_yaml, nodes)
         path = Path(args.subscription_out)
         path.parent.mkdir(parents=True, exist_ok=True)

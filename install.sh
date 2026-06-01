@@ -175,16 +175,14 @@ url_host() {
 }
 
 normalize_subscription_target() {
-  local raw="${1:-mihomo}" lower compact
+  local raw="${1:-ClashMeta}" lower compact
   lower="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
   compact="$(printf '%s' "$lower" | tr -d ' _-')"
   case "$compact" in
-    mihomo|clash|clashmeta) printf 'mihomo\n' ;;
-    v2ray|v2rayn|v2rayng) printf 'v2ray\n' ;;
-    shadowsocks|ss) printf 'shadowsocks\n' ;;
-    ssr|shadowsocksr) printf 'ssr\n' ;;
-    quantumultx|quanx|quantumult) printf 'quantumultx\n' ;;
-    shadowrocket) printf 'shadowrocket\n' ;;
+    mihomo|clash|clashmeta) printf 'ClashMeta\n' ;;
+    v2ray|v2rayn|v2rayng) printf 'V2Ray\n' ;;
+    quantumultx|quanx|quantumult|qx) printf 'QX\n' ;;
+    shadowrocket) printf 'ShadowRocket\n' ;;
     *) return 1 ;;
   esac
 }
@@ -197,18 +195,16 @@ read_subscription_target() {
       printf '%s\n' "$target"
       return 0
     fi
-    warn "$prompt 支持：Mihomo、V2Ray、Shadowsocks、SSR、Quantumult X、Shadowrocket。"
+    warn "$prompt 支持：ClashMeta、V2Ray、QX、ShadowRocket。"
   done
 }
 
 subscription_target_label() {
   case "$1" in
-    mihomo) printf 'Mihomo\n' ;;
-    v2ray) printf 'V2Ray\n' ;;
-    shadowsocks) printf 'Shadowsocks\n' ;;
-    ssr) printf 'SSR\n' ;;
-    quantumultx) printf 'Quantumult X\n' ;;
-    shadowrocket) printf 'Shadowrocket\n' ;;
+    ClashMeta) printf 'ClashMeta\n' ;;
+    V2Ray) printf 'V2Ray\n' ;;
+    QX) printf 'QX\n' ;;
+    ShadowRocket) printf 'ShadowRocket\n' ;;
     *) printf '%s\n' "$1" ;;
   esac
 }
@@ -486,10 +482,10 @@ main() {
   reset_proxy_keys="$(read_bool_value "RESET_PROXY_KEYS" "false")"
   enable_subscription_server="$(read_bool_value "ENABLE_SUBSCRIPTION_SERVER" "true")"
   subscription_port="51040"
-  subscription_target="mihomo"
+  subscription_target="ClashMeta"
   if [[ "$enable_subscription_server" == "true" ]]; then
     subscription_port="$(read_default "SUBSCRIPTION_PORT" "51040")"
-    subscription_target="$(read_subscription_target "SUBSCRIPTION_TARGET" "Mihomo")"
+    subscription_target="$(read_subscription_target "SUBSCRIPTION_TARGET" "ClashMeta")"
   fi
   home_port_start="$(read_default "HOME_PORT_START" "51043")"
   home_port_end="$(read_default "HOME_PORT_END" "51060")"

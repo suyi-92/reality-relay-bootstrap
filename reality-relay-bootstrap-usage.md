@@ -79,7 +79,7 @@ sudo bash install.sh
 | `RESET_PROXY_KEYS` | `false` | 是否重置 VLESS UUID、Reality keypair 和 short-id |
 | `ENABLE_SUBSCRIPTION_SERVER` | `true` | 是否开启简单订阅端口 |
 | `SUBSCRIPTION_PORT` | `51040` | 订阅端口；仅开启订阅服务时询问 |
-| `SUBSCRIPTION_TARGET` | `Mihomo` | 订阅格式；仅开启订阅服务时询问 |
+| `SUBSCRIPTION_TARGET` | `ClashMeta` | 订阅格式；仅开启订阅服务时询问 |
 | `HOME_PORT_START` / `HOME_PORT_END` | `51043` / `51060` | 家宽入口端口范围 |
 | `ADMIN_PUBKEY` | 空回车结束 | 本地 SSH 公钥，可填写多个 |
 | `home-proxies.csv` | 可逐条提示，也可一次性粘贴多行 CSV | 家宽出口列表；字段顺序同模板 |
@@ -802,7 +802,7 @@ sudo cat /root/reality-relay-bootstrap-clash.yaml
 ```bash
 ENABLE_SUBSCRIPTION_SERVER="true"
 SUBSCRIPTION_PORT="51040"
-SUBSCRIPTION_TARGET="mihomo"
+SUBSCRIPTION_TARGET="ClashMeta"
 ```
 
 然后执行：
@@ -815,12 +815,12 @@ sudo bash bootstrap.sh --phase firewall
 订阅地址：
 
 ```text
-http://服务器IP:51040/sub/<VLESS_UUID>?target=mihomo
+http://服务器IP:51040/sub/<VLESS_UUID>?target=ClashMeta
 ```
 
 `<VLESS_UUID>` 来自 `/etc/reality-relay-bootstrap/vless-uuid.txt`。内置订阅服务是 HTTP；如需 HTTPS，请在外层接入带证书的反向代理。仍建议只在服务商安全组里放行你的常用来源 IP。
 
-`SUBSCRIPTION_TARGET` 支持 `mihomo`、`v2ray`、`shadowsocks`、`ssr`、`quantumultx`、`shadowrocket`；默认只生成 Mihomo。当前项目仍生成 VLESS+Reality 节点，非 Mihomo target 会输出 VLESS URI 订阅。
+`SUBSCRIPTION_TARGET` 支持 `ClashMeta`、`V2Ray`、`QX`、`ShadowRocket`；默认只生成 ClashMeta。当前项目仍生成 VLESS+Reality 节点，非 ClashMeta target 会输出 VLESS URI 订阅。
 
 如果同时配置了 IPv4 和 IPv6，两个订阅链接都返回同一份完整节点；IPv4 节点名称保持不变，IPv6 节点名称追加 `-IPv6`。
 如果 Clash Verge 或浏览器无法导入 IPv6 字面量订阅地址，有 IPv4 时直接用 IPv4 订阅地址即可，它会返回同一份完整节点。

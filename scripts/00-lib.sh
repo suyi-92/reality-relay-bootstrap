@@ -164,9 +164,9 @@ load_config() {
   : "${SUBSCRIPTION_PORT:=51040}"
   : "${SUBSCRIPTION_DIR:=/etc/reality-relay-bootstrap/subscription}"
   : "${RESET_PROXY_KEYS:=false}"
-  : "${SUBSCRIPTION_TARGET:=mihomo}"
+  : "${SUBSCRIPTION_TARGET:=ClashMeta}"
   if ! SUBSCRIPTION_TARGET="$(normalize_subscription_target "$SUBSCRIPTION_TARGET")"; then
-    die "SUBSCRIPTION_TARGET 不支持：${SUBSCRIPTION_TARGET:-空}；可选：mihomo、v2ray、shadowsocks、ssr、quantumultx、shadowrocket"
+    die "SUBSCRIPTION_TARGET 不支持：${SUBSCRIPTION_TARGET:-空}；可选：ClashMeta、V2Ray、QX、ShadowRocket"
   fi
 
   validate_config_basics
@@ -214,28 +214,24 @@ url_host() {
 }
 
 normalize_subscription_target() {
-  local raw="${1:-mihomo}" lower compact
+  local raw="${1:-ClashMeta}" lower compact
   lower="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
   compact="$(printf '%s' "$lower" | tr -d ' _-')"
   case "$compact" in
-    mihomo|clash|clashmeta) printf 'mihomo\n' ;;
-    v2ray|v2rayn|v2rayng) printf 'v2ray\n' ;;
-    shadowsocks|ss) printf 'shadowsocks\n' ;;
-    ssr|shadowsocksr) printf 'ssr\n' ;;
-    quantumultx|quanx|quantumult) printf 'quantumultx\n' ;;
-    shadowrocket) printf 'shadowrocket\n' ;;
+    mihomo|clash|clashmeta) printf 'ClashMeta\n' ;;
+    v2ray|v2rayn|v2rayng) printf 'V2Ray\n' ;;
+    quantumultx|quanx|quantumult|qx) printf 'QX\n' ;;
+    shadowrocket) printf 'ShadowRocket\n' ;;
     *) return 1 ;;
   esac
 }
 
 subscription_target_label() {
   case "${1:-$SUBSCRIPTION_TARGET}" in
-    mihomo) printf 'Mihomo\n' ;;
-    v2ray) printf 'V2Ray\n' ;;
-    shadowsocks) printf 'Shadowsocks\n' ;;
-    ssr) printf 'SSR\n' ;;
-    quantumultx) printf 'Quantumult X\n' ;;
-    shadowrocket) printf 'Shadowrocket\n' ;;
+    ClashMeta) printf 'ClashMeta\n' ;;
+    V2Ray) printf 'V2Ray\n' ;;
+    QX) printf 'QX\n' ;;
+    ShadowRocket) printf 'ShadowRocket\n' ;;
     *) printf '%s\n' "${1:-$SUBSCRIPTION_TARGET}" ;;
   esac
 }

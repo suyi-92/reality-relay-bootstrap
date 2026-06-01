@@ -264,7 +264,7 @@ sudo cat /root/reality-relay-bootstrap-clash.yaml
 ```bash
 ENABLE_SUBSCRIPTION_SERVER="true"
 SUBSCRIPTION_PORT="51040"
-SUBSCRIPTION_TARGET="mihomo"
+SUBSCRIPTION_TARGET="ClashMeta"
 ```
 
 然后执行：
@@ -277,11 +277,11 @@ sudo bash bootstrap.sh --phase firewall
 订阅地址：
 
 ```text
-http://服务器IP:51040/sub/<VLESS_UUID>?target=mihomo
+http://服务器IP:51040/sub/<VLESS_UUID>?target=ClashMeta
 ```
 
 内置服务是 HTTP，URL 里的 token 使用 `/etc/reality-relay-bootstrap/vless-uuid.txt`。仍建议只在服务商安全组里放行你的常用来源 IP。
-`SUBSCRIPTION_TARGET` 支持 `mihomo`、`v2ray`、`shadowsocks`、`ssr`、`quantumultx`、`shadowrocket`；默认只生成 Mihomo。当前项目的节点协议仍是 VLESS+Reality，非 Mihomo target 会输出 VLESS URI 订阅。
+`SUBSCRIPTION_TARGET` 支持 `ClashMeta`、`V2Ray`、`QX`、`ShadowRocket`；默认只生成 ClashMeta。当前项目的节点协议仍是 VLESS+Reality，非 ClashMeta target 会输出 VLESS URI 订阅。
 如果同时配置了 IPv4 和 IPv6，两个订阅链接都返回同一份完整节点；IPv4 节点名称保持不变，IPv6 节点名称追加 `-IPv6`。
 如果 Clash Verge 或浏览器无法导入 IPv6 字面量订阅地址，有 IPv4 时直接用 IPv4 订阅地址即可，它会返回同一份完整节点。
 

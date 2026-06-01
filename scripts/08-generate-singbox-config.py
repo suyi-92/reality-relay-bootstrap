@@ -87,12 +87,10 @@ AI_IP_CIDRS = [
 ]
 
 SUBSCRIPTION_TARGETS = {
-    "mihomo",
-    "v2ray",
-    "shadowsocks",
-    "ssr",
-    "quantumultx",
-    "shadowrocket",
+    "ClashMeta",
+    "V2Ray",
+    "QX",
+    "ShadowRocket",
 }
 
 
@@ -180,7 +178,7 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
         "SUBSCRIPTION_PORT": "51040",
         "SUBSCRIPTION_DIR": f"{state_dir}/subscription",
         "RESET_PROXY_KEYS": "false",
-        "SUBSCRIPTION_TARGET": "mihomo",
+        "SUBSCRIPTION_TARGET": "ClashMeta",
     }
     for k, v in d.items():
         merged.setdefault(k, v)
@@ -191,7 +189,7 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
         merged["SERVER_IP_IPV4"] = server_ip
     if not merged.get("SERVER_IP"):
         merged["SERVER_IP"] = merged.get("SERVER_IP_IPV4") or merged.get("SERVER_IP_IPV6") or ""
-    merged["SUBSCRIPTION_TARGET"] = normalize_subscription_target(merged.get("SUBSCRIPTION_TARGET", "mihomo"))
+    merged["SUBSCRIPTION_TARGET"] = normalize_subscription_target(merged.get("SUBSCRIPTION_TARGET", "ClashMeta"))
 
     default_state_dir = "/etc/reality-relay-bootstrap"
     if merged["RRB_STATE_DIR"] != default_state_dir:
@@ -208,16 +206,19 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
 
 
 def normalize_subscription_target(value: str) -> str:
-    compact = re.sub(r"[\s_-]+", "", (value or "mihomo").lower())
+    compact = re.sub(r"[\s_-]+", "", (value or "ClashMeta").lower())
     aliases = {
-        "clash": "mihomo",
-        "clashmeta": "mihomo",
-        "v2rayn": "v2ray",
-        "v2rayng": "v2ray",
-        "ss": "shadowsocks",
-        "shadowsocksr": "ssr",
-        "quanx": "quantumultx",
-        "quantumult": "quantumultx",
+        "mihomo": "ClashMeta",
+        "clash": "ClashMeta",
+        "clashmeta": "ClashMeta",
+        "v2ray": "V2Ray",
+        "v2rayn": "V2Ray",
+        "v2rayng": "V2Ray",
+        "qx": "QX",
+        "quanx": "QX",
+        "quantumult": "QX",
+        "quantumultx": "QX",
+        "shadowrocket": "ShadowRocket",
     }
     target = aliases.get(compact, compact)
     if target not in SUBSCRIPTION_TARGETS:
@@ -286,7 +287,7 @@ def validate_env(env: Dict[str, str]) -> None:
         "RESET_PROXY_KEYS",
     ]:
         as_bool(env, key)
-    normalize_subscription_target(env.get("SUBSCRIPTION_TARGET", "mihomo"))
+    normalize_subscription_target(env.get("SUBSCRIPTION_TARGET", "ClashMeta"))
     if direct_port != 443:
         print(f"WARN: DIRECT_PORT={direct_port}，不是默认 443。", file=sys.stderr)
     if as_bool(env, "ENABLE_IPV6_LISTEN"):
