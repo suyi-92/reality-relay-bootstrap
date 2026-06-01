@@ -45,9 +45,15 @@ clear_screen() {
 
 banner() {
   clear_screen
-  printf '%b\n' "${CYAN}${BOLD}Reality Relay Bootstrap 一键安装${RESET}"
-  printf '%b\n' "${CYAN}只填写服务器身份、SSH 管理员公钥和家宽代理，其余用默认值${RESET}"
-  line
+  printf '%b\n' "${CYAN}${BOLD}"
+  cat <<'BANNER'
+╭────────────────────────────────────────────────╮
+│            Reality Relay Bootstrap             │
+│              One-click installer               │
+│     Server, SSH key, and home proxies only     │
+╰────────────────────────────────────────────────╯
+BANNER
+  printf '%b' "${RESET}"
 }
 
 read_default() {
