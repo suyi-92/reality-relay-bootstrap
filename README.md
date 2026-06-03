@@ -67,7 +67,7 @@ bash <(wget -qO- https://raw.githubusercontent.com/suyi-92/reality-relay-bootstr
 sudo bash install.sh
 ```
 
-一键脚本仍然保留 SSH 二阶段安全确认：完成 `ssh-phase1` 后，需要你另开窗口确认 admin 公钥登录和 `sudo` 正常，才会继续执行 `ssh-final`。家宽代理既可以按提示逐个填写，也可以选择一次性粘贴多行 CSV；上游节点可以直接逐行粘贴 `hysteria2://` 或 `vless://` Reality 分享链接，也可以粘贴 `tag,listen_port,node_url` CSV。
+一键脚本仍然保留 SSH 二阶段安全确认：完成 `ssh-phase1` 后，需要你另开窗口确认 admin 公钥登录和 `sudo` 正常，才会继续执行 `ssh-final`。家宽代理既可以按提示逐个填写，也可以选择一次性粘贴多行 CSV；上游节点可以直接逐行粘贴 `hysteria2://`、普通 `vless://` 或 VLESS Reality 分享链接，也可以粘贴 `tag,listen_port,node_url` CSV。
 
 ## 第一次使用
 
@@ -89,7 +89,7 @@ nano upstream-nodes.txt
 
 `home-proxies.csv` 的字段顺序为 `tag,listen_port,type,server,server_port,username,password,network`。分步骤配置时可以直接编辑这个 CSV；一键安装时也可以把同样格式的多行 CSV 一次性粘贴进去。
 
-`upstream-nodes.txt` 用来把别人给你的上游代理节点接到新的中转入口端口。支持 `hysteria2://` 和 `vless://...security=reality...`，可以写成 `tag,listen_port,node_url`，也可以只放节点链接让脚本自动分配 tag 和端口。
+`upstream-nodes.txt` 用来把别人给你的上游代理节点接到新的中转入口端口。支持 `hysteria2://`、`vless://...security=none...` 和 `vless://...security=reality...`，可以写成 `tag,listen_port,node_url`，也可以只放节点链接让脚本自动分配 tag 和端口。
 
 先 dry-run：
 
@@ -196,9 +196,10 @@ home-02,51044,http,proxy2.example.com,8080,user2,password2,tcp
 tag,listen_port,node_url
 hy2-relay,51047,hysteria2://password@example.com:443?alpn=h3&insecure=1#hy2
 vless-relay,51048,vless://uuid@example.com:443?encryption=none&security=reality&flow=xtls-rprx-vision&type=tcp&sni=www.cloudflare.com&pbk=PUBLIC_KEY&fp=chrome#vless
+vless-plain,51049,vless://uuid@example.com:12345?type=tcp&encryption=none&security=none#vless-plain
 ```
 
-也可以不写表头，只逐行放节点链接；脚本会从 `HOME_PORT_START` 到 `HOME_PORT_END` 的空闲端口中自动分配。当前第一版支持 Hysteria2 和 VLESS Reality 上游。
+也可以不写表头，只逐行放节点链接；脚本会从 `HOME_PORT_START` 到 `HOME_PORT_END` 的空闲端口中自动分配。当前支持 Hysteria2、普通 VLESS TCP 和 VLESS Reality 上游。
 
 ## 标准执行流程
 

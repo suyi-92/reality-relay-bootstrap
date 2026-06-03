@@ -441,7 +441,7 @@ collect_upstream_nodes() {
 
   line
   printf '%b\n' "${CYAN}${BOLD}上游节点配置${RESET}"
-  printf '%b\n' "${DIM}可选：把别人给你的 hysteria2:// 或 vless:// Reality 节点接到新的入口端口。${RESET}"
+  printf '%b\n' "${DIM}可选：把别人给你的 hysteria2://、普通 vless:// 或 VLESS Reality 节点接到新的入口端口。${RESET}"
   if ! read_yes_no "是否粘贴上游节点分享链接或 CSV？" no; then
     return 0
   fi

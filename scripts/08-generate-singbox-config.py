@@ -443,41 +443,15 @@ def parse_vless_upstream(tag: str, listen_port: int, node_url: str, lineno: int)
     uuid = userinfo_password(split)
     if not UUID_RE.match(uuid):
         raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行 VLESS UUID 不合法。")
-    security = first_query_value(params, "security").lower()
-    if security != "reality":
-        raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行 VLESS 上游目前只支持 security=reality。")
+    security = (first_query_value(params, "security") or "none").lower()
+    if security not in {"none", "reality"}:
+        raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行 VLESS 上游目前只支持 security=none 或 security=reality。")
     transport = first_query_value(params, "type", "transport") or "tcp"
     if transport != "tcp":
-        raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行 VLESS Reality 上游目前只支持 type=tcp。")
+        raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行 VLESS 上游目前只支持 type=tcp。")
     encryption = first_query_value(params, "encryption") or "none"
     if encryption != "none":
         raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行 VLESS encryption 目前只支持 none。")
-
-    public_key = first_query_value(params, "pbk", "public_key", "public-key", "reality-public-key")
-    if not public_key:
-        raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行 VLESS Reality 缺少 pbk。")
-
-    tls: Dict[str, Any] = {
-        "enabled": True,
-        "reality": {
-            "enabled": True,
-            "public_key": public_key,
-        },
-    }
-    server_name = first_query_value(params, "sni", "server_name", "servername")
-    if server_name:
-        tls["server_name"] = server_name
-    short_id = first_query_value(params, "sid", "short_id", "short-id")
-    if short_id:
-        tls["reality"]["short_id"] = short_id
-    fingerprint = first_query_value(params, "fp", "fingerprint")
-    if fingerprint:
-        tls["utls"] = {"enabled": True, "fingerprint": fingerprint}
-    alpn = split_csv_items(first_query_value(params, "alpn"))
-    if alpn:
-        tls["alpn"] = alpn
-    if query_bool(params, "insecure", "allowInsecure"):
-        tls["insecure"] = True
 
     outbound: Dict[str, Any] = {
         "type": "vless",
@@ -486,17 +460,43 @@ def parse_vless_upstream(tag: str, listen_port: int, node_url: str, lineno: int)
         "server_port": port,
         "uuid": uuid,
         "network": "tcp",
-        "tls": tls,
         "domain_resolver": "dns-cloudflare",
     }
     flow = first_query_value(params, "flow")
     if flow:
         outbound["flow"] = flow
 
+    if security == "reality":
+        public_key = first_query_value(params, "pbk", "public_key", "public-key", "reality-public-key")
+        if not public_key:
+            raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行 VLESS Reality 缺少 pbk。")
+        tls: Dict[str, Any] = {
+            "enabled": True,
+            "reality": {
+                "enabled": True,
+                "public_key": public_key,
+            },
+        }
+        server_name = first_query_value(params, "sni", "server_name", "servername")
+        if server_name:
+            tls["server_name"] = server_name
+        short_id = first_query_value(params, "sid", "short_id", "short-id")
+        if short_id:
+            tls["reality"]["short_id"] = short_id
+        fingerprint = first_query_value(params, "fp", "fingerprint")
+        if fingerprint:
+            tls["utls"] = {"enabled": True, "fingerprint": fingerprint}
+        alpn = split_csv_items(first_query_value(params, "alpn"))
+        if alpn:
+            tls["alpn"] = alpn
+        if query_bool(params, "insecure", "allowInsecure"):
+            tls["insecure"] = True
+        outbound["tls"] = tls
+
     return {
         "tag": tag,
         "listen_port": listen_port,
-        "type": "vless-reality",
+        "type": "vless-reality" if security == "reality" else "vless",
         "server": host,
         "server_port": port,
         "source": "upstream",
@@ -511,7 +511,7 @@ def parse_upstream_node(tag: str, listen_port: int, node_url: str, lineno: int) 
         return parse_hysteria2_upstream(tag, listen_port, url, lineno)
     if scheme == "vless":
         return parse_vless_upstream(tag, listen_port, node_url, lineno)
-    raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行暂不支持协议：{scheme or '空'}；当前支持 hysteria2 和 vless reality。")
+    raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行暂不支持协议：{scheme or '空'}；当前支持 hysteria2、vless security=none 和 vless reality。")
 
 
 def load_home_rows(

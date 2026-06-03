@@ -85,14 +85,14 @@ sudo bash install.sh
 | `HOME_PORT_START` / `HOME_PORT_END` | `51043` / `51060` | 家宽入口端口范围 |
 | `ADMIN_PUBKEY` | 空回车结束 | 本地 SSH 公钥，可填写多个 |
 | `home-proxies.csv` | 可逐条提示，也可一次性粘贴多行 CSV | 家宽出口列表；字段顺序同模板 |
-| `upstream-nodes.txt` | 可选，空行结束 | 上游节点分享链接；支持 hysteria2 和 vless reality |
+| `upstream-nodes.txt` | 可选，空行结束 | 上游节点分享链接；支持 hysteria2、vless plain 和 vless reality |
 
 注意事项：
 
 1. 脚本会把远程一键模式的项目目录放在 `/opt/reality-relay-bootstrap`；可通过 `RRB_INSTALL_DIR=/path bash <(wget ...)` 覆盖。
 2. 写出的 `config.env`、`home-proxies.csv` 和 `upstream-nodes.txt` 权限会设置为 `600`，不要公开。
 3. 选择一次性粘贴家宽代理时，可以带 `tag,listen_port,type,server,server_port,username,password,network` 表头；粘贴完成后输入空行结束。
-4. 选择粘贴上游节点时，可以直接逐行粘贴 `hysteria2://` 或 `vless://` Reality 链接；也可以带 `tag,listen_port,node_url` 表头。
+4. 选择粘贴上游节点时，可以直接逐行粘贴 `hysteria2://`、普通 `vless://` 或 VLESS Reality 链接；也可以带 `tag,listen_port,node_url` 表头。
 5. 执行到 `ssh-phase1` 后，脚本会停下来提示你另开窗口测试 admin key 登录；只有你确认成功后，才继续执行 `ssh-final`、fail2ban、sing-box、UFW、验证和节点输出。
 6. 如果只想生成配置、不自动跑部署阶段，可使用：
 
@@ -572,6 +572,7 @@ cat home-proxies.csv
 
 ```text
 hysteria2://...
+vless://...security=none...
 vless://...security=reality...
 ```
 
@@ -588,6 +589,7 @@ nano upstream-nodes.txt
 tag,listen_port,node_url
 hy2-relay,51047,hysteria2://password@example.com:443?alpn=h3&insecure=1#hy2
 vless-relay,51048,vless://uuid@example.com:443?encryption=none&security=reality&flow=xtls-rprx-vision&type=tcp&sni=www.cloudflare.com&pbk=PUBLIC_KEY&fp=chrome#vless
+vless-plain,51049,vless://uuid@example.com:12345?type=tcp&encryption=none&security=none#vless-plain
 ```
 
 也可以不写表头，只逐行放节点链接；脚本会自动分配 tag 和 `HOME_PORT_START` 到 `HOME_PORT_END` 范围内的空闲端口。
@@ -597,7 +599,7 @@ vless-relay,51048,vless://uuid@example.com:443?encryption=none&security=reality&
 1. `listen_port` 不能与 `DIRECT_PORT`、`home-proxies.csv` 或其他上游节点重复。
 2. `listen_port` 必须在 `HOME_PORT_START` 和 `HOME_PORT_END` 范围内。
 3. 上游节点链接里包含密码、UUID、Reality public key 等连接信息，不要公开、不要提交到 GitHub。
-4. 这不是简单 TCP 转发；客户端连你的 VPS，VPS 再用 Hysteria2 或 VLESS Reality 连接上游节点。
+4. 这不是简单 TCP 转发；客户端连你的 VPS，VPS 再用 Hysteria2、普通 VLESS TCP 或 VLESS Reality 连接上游节点。
 
 ---
 
