@@ -18,6 +18,7 @@ import shlex
 import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
+from urllib.parse import parse_qs, unquote, urlsplit
 
 TAG_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 DOMAIN_RE = re.compile(r"^[A-Za-z0-9._-]+$")
@@ -32,6 +33,11 @@ REQUIRED_COLUMNS = {
     "username",
     "password",
     "network",
+}
+REQUIRED_UPSTREAM_COLUMNS = {
+    "tag",
+    "listen_port",
+    "node_url",
 }
 
 AI_DOMAINS = [
@@ -157,6 +163,7 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
         "ENABLE_FAIL2BAN": "true",
         "ENABLE_IPV6_LISTEN": "false",
         "CSV_PATH": "./home-proxies.csv",
+        "UPSTREAM_NODES_PATH": "./upstream-nodes.txt",
         "RRB_STATE_DIR": state_dir,
         "SINGBOX_CONFIG_PATH": "/etc/sing-box/config.json",
         "VLESS_UUID_PATH": f"{state_dir}/vless-uuid.txt",
@@ -300,7 +307,220 @@ def iter_csv_lines(path: Path) -> Iterable[str]:
             yield line
 
 
-def load_rows(env: Dict[str, str], base: Path, allow_empty: bool = True) -> List[Dict[str, Any]]:
+def check_tag_and_port(
+    *,
+    tag: str,
+    listen_port: int,
+    direct_port: int,
+    start: int,
+    end: int,
+    used_tags: set[str],
+    used_ports: set[int],
+    label: str,
+    lineno: int,
+) -> None:
+    if not TAG_RE.match(tag):
+        raise ConfigError(f"{label} 第 {lineno} 行 tag 不合法：{tag}；只能用英文、数字、下划线、短横线")
+    if tag in used_tags:
+        raise ConfigError(f"{label} 第 {lineno} 行 tag 重复：{tag}")
+    if not (1 <= listen_port <= 65535):
+        raise ConfigError(f"{label} 第 {lineno} 行 listen_port 超出范围 1-65535：{listen_port}")
+    if listen_port == direct_port:
+        raise ConfigError(f"{label} 第 {lineno} 行 listen_port 不能使用 {direct_port}；该端口保留给 443 入口")
+    if listen_port in used_ports:
+        raise ConfigError(f"{label} 第 {lineno} 行 listen_port 重复：{listen_port}")
+    if not (start <= listen_port <= end):
+        raise ConfigError(f"{label} 第 {lineno} 行 listen_port={listen_port} 不在 HOME_PORT_START/HOME_PORT_END 范围 {start}-{end}")
+    used_tags.add(tag)
+    used_ports.add(listen_port)
+
+
+def next_available_port(start: int, end: int, used_ports: set[int]) -> int:
+    for port in range(start, end + 1):
+        if port not in used_ports:
+            return port
+    raise ConfigError(f"没有可用上游节点入口端口；请调大 HOME_PORT_END 或移除未使用端口。")
+
+
+def safe_tag(value: str, fallback: str, used_tags: set[str]) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9_-]+", "-", unquote(value or "")).strip("-_")
+    if not cleaned or not TAG_RE.match(cleaned):
+        cleaned = fallback
+    candidate = cleaned
+    index = 2
+    while candidate in used_tags:
+        candidate = f"{cleaned}-{index:02d}"
+        index += 1
+    return candidate
+
+
+def first_query_value(params: Dict[str, List[str]], *names: str) -> str:
+    compact = {re.sub(r"[\s_-]+", "", key).lower(): values for key, values in params.items()}
+    for name in names:
+        values = compact.get(re.sub(r"[\s_-]+", "", name).lower())
+        if values:
+            return unquote(values[0])
+    return ""
+
+
+def query_bool(params: Dict[str, List[str]], *names: str) -> bool:
+    value = first_query_value(params, *names).lower()
+    return value in {"1", "true", "yes", "y"}
+
+
+def split_csv_items(value: str) -> List[str]:
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def split_host_port(url: str, scheme: str, lineno: int) -> Tuple[Any, str, int, Dict[str, List[str]]]:
+    split = urlsplit(url.replace("&amp;", "&"))
+    if split.scheme.lower() != scheme:
+        raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行协议应为 {scheme}://")
+    host = split.hostname
+    try:
+        port = split.port
+    except ValueError as exc:
+        raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行 server_port 不合法：{url}") from exc
+    if not host or port is None:
+        raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行缺少 server 或 server_port：{url}")
+    return split, host, port, parse_qs(split.query, keep_blank_values=True)
+
+
+def userinfo_password(split: Any) -> str:
+    if "@" not in split.netloc:
+        return ""
+    return unquote(split.netloc.rsplit("@", 1)[0])
+
+
+def parse_hysteria2_upstream(tag: str, listen_port: int, node_url: str, lineno: int) -> Dict[str, Any]:
+    split, host, port, params = split_host_port(node_url, "hysteria2", lineno)
+    password = userinfo_password(split) or first_query_value(params, "password", "auth")
+    if not password:
+        raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行 hysteria2 节点缺少密码。")
+
+    tls: Dict[str, Any] = {"enabled": True}
+    server_name = first_query_value(params, "sni", "peer", "server_name", "servername")
+    if server_name:
+        tls["server_name"] = server_name
+    alpn = split_csv_items(first_query_value(params, "alpn"))
+    if alpn:
+        tls["alpn"] = alpn
+    if query_bool(params, "insecure", "allowInsecure"):
+        tls["insecure"] = True
+
+    outbound: Dict[str, Any] = {
+        "type": "hysteria2",
+        "tag": f"out-{tag}",
+        "server": host,
+        "server_port": port,
+        "password": password,
+        "tls": tls,
+        "domain_resolver": "dns-cloudflare",
+    }
+    network = first_query_value(params, "network")
+    if network:
+        if network not in {"tcp", "udp"}:
+            raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行 hysteria2 network 只支持 tcp 或 udp。")
+        outbound["network"] = network
+    obfs = first_query_value(params, "obfs", "obfs_type")
+    obfs_password = first_query_value(params, "obfs-password", "obfs_password")
+    if obfs and obfs_password:
+        outbound["obfs"] = {"type": obfs, "password": obfs_password}
+
+    return {
+        "tag": tag,
+        "listen_port": listen_port,
+        "type": "hysteria2",
+        "server": host,
+        "server_port": port,
+        "source": "upstream",
+        "outbound": outbound,
+    }
+
+
+def parse_vless_upstream(tag: str, listen_port: int, node_url: str, lineno: int) -> Dict[str, Any]:
+    split, host, port, params = split_host_port(node_url, "vless", lineno)
+    uuid = userinfo_password(split)
+    if not UUID_RE.match(uuid):
+        raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行 VLESS UUID 不合法。")
+    security = first_query_value(params, "security").lower()
+    if security != "reality":
+        raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行 VLESS 上游目前只支持 security=reality。")
+    transport = first_query_value(params, "type", "transport") or "tcp"
+    if transport != "tcp":
+        raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行 VLESS Reality 上游目前只支持 type=tcp。")
+    encryption = first_query_value(params, "encryption") or "none"
+    if encryption != "none":
+        raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行 VLESS encryption 目前只支持 none。")
+
+    public_key = first_query_value(params, "pbk", "public_key", "public-key", "reality-public-key")
+    if not public_key:
+        raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行 VLESS Reality 缺少 pbk。")
+
+    tls: Dict[str, Any] = {
+        "enabled": True,
+        "reality": {
+            "enabled": True,
+            "public_key": public_key,
+        },
+    }
+    server_name = first_query_value(params, "sni", "server_name", "servername")
+    if server_name:
+        tls["server_name"] = server_name
+    short_id = first_query_value(params, "sid", "short_id", "short-id")
+    if short_id:
+        tls["reality"]["short_id"] = short_id
+    fingerprint = first_query_value(params, "fp", "fingerprint")
+    if fingerprint:
+        tls["utls"] = {"enabled": True, "fingerprint": fingerprint}
+    alpn = split_csv_items(first_query_value(params, "alpn"))
+    if alpn:
+        tls["alpn"] = alpn
+    if query_bool(params, "insecure", "allowInsecure"):
+        tls["insecure"] = True
+
+    outbound: Dict[str, Any] = {
+        "type": "vless",
+        "tag": f"out-{tag}",
+        "server": host,
+        "server_port": port,
+        "uuid": uuid,
+        "network": "tcp",
+        "tls": tls,
+        "domain_resolver": "dns-cloudflare",
+    }
+    flow = first_query_value(params, "flow")
+    if flow:
+        outbound["flow"] = flow
+
+    return {
+        "tag": tag,
+        "listen_port": listen_port,
+        "type": "vless-reality",
+        "server": host,
+        "server_port": port,
+        "source": "upstream",
+        "outbound": outbound,
+    }
+
+
+def parse_upstream_node(tag: str, listen_port: int, node_url: str, lineno: int) -> Dict[str, Any]:
+    scheme = urlsplit(node_url.strip().replace("&amp;", "&")).scheme.lower()
+    if scheme in {"hysteria2", "hy2"}:
+        url = "hysteria2://" + node_url.split("://", 1)[1] if scheme == "hy2" else node_url
+        return parse_hysteria2_upstream(tag, listen_port, url, lineno)
+    if scheme == "vless":
+        return parse_vless_upstream(tag, listen_port, node_url, lineno)
+    raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行暂不支持协议：{scheme or '空'}；当前支持 hysteria2 和 vless reality。")
+
+
+def load_home_rows(
+    env: Dict[str, str],
+    base: Path,
+    used_tags: set[str],
+    used_ports: set[int],
+    allow_empty: bool,
+) -> List[Dict[str, Any]]:
     csv_path = resolve_path(env, "CSV_PATH", base)
     if not csv_path.exists():
         state_csv = Path(env["RRB_STATE_DIR"]) / "home-proxies.csv"
@@ -326,8 +546,6 @@ def load_rows(env: Dict[str, str], base: Path, allow_empty: bool = True) -> List
     direct_port = as_port(env, "DIRECT_PORT")
     start = as_port(env, "HOME_PORT_START")
     end = as_port(env, "HOME_PORT_END")
-    used_tags = set()
-    used_ports = {direct_port}
     rows: List[Dict[str, Any]] = []
 
     for lineno, row in enumerate(reader, start=2):
@@ -339,27 +557,25 @@ def load_rows(env: Dict[str, str], base: Path, allow_empty: bool = True) -> List
         proto = normalized["type"].lower()
         network = (normalized.get("network") or "tcp").lower()
 
-        if not TAG_RE.match(tag):
-            raise ConfigError(f"第 {lineno} 行 tag 不合法：{tag}；只能用英文、数字、下划线、短横线")
-        if tag in used_tags:
-            raise ConfigError(f"第 {lineno} 行 tag 重复：{tag}")
-        used_tags.add(tag)
-
         try:
             listen_port = int(normalized["listen_port"])
             server_port = int(normalized["server_port"])
         except ValueError as exc:
             raise ConfigError(f"第 {lineno} 行 listen_port/server_port 必须是数字") from exc
 
-        if not (1 <= listen_port <= 65535 and 1 <= server_port <= 65535):
-            raise ConfigError(f"第 {lineno} 行端口超出范围 1-65535")
-        if listen_port == direct_port:
-            raise ConfigError(f"第 {lineno} 行 listen_port 不能使用 {direct_port}；该端口保留给 443 入口")
-        if listen_port in used_ports:
-            raise ConfigError(f"第 {lineno} 行 listen_port 重复：{listen_port}")
-        if not (start <= listen_port <= end):
-            raise ConfigError(f"第 {lineno} 行 listen_port={listen_port} 不在 HOME_PORT_START/HOME_PORT_END 范围 {start}-{end}")
-        used_ports.add(listen_port)
+        if not (1 <= server_port <= 65535):
+            raise ConfigError(f"第 {lineno} 行 server_port 超出范围 1-65535：{server_port}")
+        check_tag_and_port(
+            tag=tag,
+            listen_port=listen_port,
+            direct_port=direct_port,
+            start=start,
+            end=end,
+            used_tags=used_tags,
+            used_ports=used_ports,
+            label="home-proxies.csv",
+            lineno=lineno,
+        )
 
         if proto not in {"socks5", "socks", "http"}:
             raise ConfigError(f"第 {lineno} 行 type 只支持 socks5 或 http")
@@ -380,6 +596,7 @@ def load_rows(env: Dict[str, str], base: Path, allow_empty: bool = True) -> List
                 "username": normalized["username"],
                 "password": normalized["password"],
                 "network": network,
+                "source": "home",
             }
         )
 
@@ -387,6 +604,89 @@ def load_rows(env: Dict[str, str], base: Path, allow_empty: bool = True) -> List
         raise ConfigError("MODE_443=smart 需要至少一行家宽代理，用于 AI 域名出口。")
     if not rows and not allow_empty:
         raise ConfigError("home-proxies.csv 没有任何家宽代理行。")
+    return rows
+
+
+def load_upstream_rows(env: Dict[str, str], base: Path, used_tags: set[str], used_ports: set[int]) -> List[Dict[str, Any]]:
+    path = resolve_path(env, "UPSTREAM_NODES_PATH", base)
+    if not path.exists():
+        state_path = Path(env["RRB_STATE_DIR"]) / "upstream-nodes.txt"
+        if state_path.exists():
+            path = state_path
+        else:
+            return []
+
+    try:
+        lines = list(iter_csv_lines(path))
+    except UnicodeDecodeError as exc:
+        raise ConfigError(f"upstream-nodes.txt 必须是 UTF-8：{exc}") from exc
+    if not lines:
+        return []
+
+    direct_port = as_port(env, "DIRECT_PORT")
+    start = as_port(env, "HOME_PORT_START")
+    end = as_port(env, "HOME_PORT_END")
+    rows: List[Dict[str, Any]] = []
+    first = lines[0].strip()
+
+    if first.lower().replace(" ", "").startswith("tag,listen_port,node_url"):
+        reader = csv.DictReader(lines)
+        missing = REQUIRED_UPSTREAM_COLUMNS - set(reader.fieldnames or [])
+        if missing:
+            raise ConfigError("upstream-nodes.txt 表头缺少字段：" + ", ".join(sorted(missing)))
+        iterable = []
+        for lineno, row in enumerate(reader, start=2):
+            normalized = {k: (v or "").strip() for k, v in row.items()}
+            if not any(normalized.values()):
+                continue
+            try:
+                listen_port = int(normalized["listen_port"])
+            except ValueError as exc:
+                raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行 listen_port 必须是数字") from exc
+            iterable.append((lineno, normalized["tag"], listen_port, normalized["node_url"]))
+    else:
+        iterable = []
+        local_seen_tags: set[str] = set()
+        local_seen_ports: set[int] = set()
+        for index, raw in enumerate(lines, start=1):
+            node_url = raw.strip()
+            if not node_url:
+                continue
+            split = urlsplit(node_url.replace("&amp;", "&"))
+            fragment_tag = safe_tag(split.fragment, f"upstream-{index:02d}", used_tags | local_seen_tags)
+            listen_port = next_available_port(start, end, used_ports | local_seen_ports)
+            local_seen_tags.add(fragment_tag)
+            local_seen_ports.add(listen_port)
+            iterable.append((index, fragment_tag, listen_port, node_url))
+
+    for lineno, tag, listen_port, node_url in iterable:
+        if not node_url:
+            raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行 node_url 不能为空")
+        check_tag_and_port(
+            tag=tag,
+            listen_port=listen_port,
+            direct_port=direct_port,
+            start=start,
+            end=end,
+            used_tags=used_tags,
+            used_ports=used_ports,
+            label="upstream-nodes.txt",
+            lineno=lineno,
+        )
+        rows.append(parse_upstream_node(tag, listen_port, node_url, lineno))
+    return rows
+
+
+def load_rows(env: Dict[str, str], base: Path, allow_empty: bool = True) -> List[Dict[str, Any]]:
+    direct_port = as_port(env, "DIRECT_PORT")
+    used_tags: set[str] = set()
+    used_ports: set[int] = {direct_port}
+    rows = load_home_rows(env, base, used_tags, used_ports, allow_empty=True)
+    rows.extend(load_upstream_rows(env, base, used_tags, used_ports))
+    if env["MODE_443"] == "smart" and not any(row.get("source") == "home" for row in rows):
+        raise ConfigError("MODE_443=smart 需要至少一行家宽代理，用于 AI 域名出口。")
+    if not rows and not allow_empty:
+        raise ConfigError("没有任何家宽代理或上游节点行。")
     return rows
 
 
@@ -456,6 +756,10 @@ def build_vless_reality_inbound(tag: str, port: int, uuid: str, private_key: str
 
 def build_home_outbound(row: Dict[str, Any]) -> Dict[str, Any]:
     tag = f"out-{row['tag']}"
+    if row.get("source") == "upstream":
+        outbound = dict(row["outbound"])
+        outbound["tag"] = tag
+        return outbound
     if row["type"] in {"socks", "socks5"}:
         outbound: Dict[str, Any] = {
             "type": "socks",
@@ -487,15 +791,16 @@ def build_home_outbound(row: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def select_ai_outbound(env: Dict[str, str], rows: List[Dict[str, Any]]) -> Tuple[str, str]:
+    home_rows = [row for row in rows if row.get("source") == "home"]
     requested = env.get("SMART_AI_HOME_TAG", "").strip()
     if requested:
-        for row in rows:
+        for row in home_rows:
             if row["tag"] == requested:
                 return f"out-{row['tag']}", row["tag"]
-        available = ", ".join(row["tag"] for row in rows)
+        available = ", ".join(row["tag"] for row in home_rows)
         raise ConfigError(f"SMART_AI_HOME_TAG={requested} 不存在；可用 tag：{available}")
-    if rows:
-        first = rows[0]
+    if home_rows:
+        first = home_rows[0]
         return f"out-{first['tag']}", first["tag"]
     return "direct", "direct"
 
@@ -624,7 +929,7 @@ def node_list(env: Dict[str, str], rows: List[Dict[str, Any]]) -> List[Dict[str,
             {
                 "name": row["tag"],
                 "port": row["listen_port"],
-                "kind": "home",
+                "kind": row.get("source", "home"),
                 "home_tag": row["tag"],
             }
         )
@@ -642,12 +947,18 @@ def print_summary(env: Dict[str, str], rows: List[Dict[str, Any]]) -> None:
         outbound, tag = select_ai_outbound(env, rows)
         print(f"Smart 443 AI 出口：{tag} ({outbound})")
     print("将开放端口：" + ", ".join(str(p) for p in port_list(env, rows)))
-    if rows:
+    home_rows = [row for row in rows if row.get("source") == "home"]
+    upstream_rows = [row for row in rows if row.get("source") == "upstream"]
+    if home_rows:
         print("家宽映射：")
-        for row in rows:
+        for row in home_rows:
             print(f"  {row['tag']} {row['listen_port']} -> {row['type']}://{row['server']}:{row['server_port']}")
-    else:
-        print("CSV 无家宽行；仅生成 443 入口。")
+    if upstream_rows:
+        print("上游节点映射：")
+        for row in upstream_rows:
+            print(f"  {row['tag']} {row['listen_port']} -> {row['type']}://{row['server']}:{row['server_port']}")
+    if not home_rows and not upstream_rows:
+        print("没有家宽代理或上游节点行；仅生成 443 入口。")
 
 
 def main() -> int:

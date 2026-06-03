@@ -133,6 +133,7 @@ load_config() {
   : "${ENABLE_IPV6_LISTEN:=false}"
   : "${ADMIN_SUDO_NOPASSWD:=true}"
   : "${CSV_PATH:=./home-proxies.csv}"
+  : "${UPSTREAM_NODES_PATH:=./upstream-nodes.txt}"
   : "${RRB_STATE_DIR:=/etc/reality-relay-bootstrap}"
   export RRB_STATE_DIR
   : "${SINGBOX_CONFIG_PATH:=/etc/sing-box/config.json}"
@@ -171,6 +172,7 @@ load_config() {
 
   validate_config_basics
   resolve_csv_path
+  resolve_upstream_nodes_path
 }
 
 server_ipv4_hosts() {
@@ -308,6 +310,13 @@ resolve_csv_path() {
     CSV_PATH="$RRB_PROJECT_DIR/${CSV_PATH#./}"
   fi
   export CSV_PATH
+}
+
+resolve_upstream_nodes_path() {
+  if [[ "$UPSTREAM_NODES_PATH" != /* ]]; then
+    UPSTREAM_NODES_PATH="$RRB_PROJECT_DIR/${UPSTREAM_NODES_PATH#./}"
+  fi
+  export UPSTREAM_NODES_PATH
 }
 
 require_supported_os() {

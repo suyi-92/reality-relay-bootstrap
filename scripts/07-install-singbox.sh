@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 安装 sing-box，准备 VLESS UUID、Reality keypair、short-id、CSV 和备份。
+# 安装 sing-box，准备 VLESS UUID、Reality keypair、short-id、出口文件和备份。
 set -Eeuo pipefail
 PHASE_NAME="singbox-install"
 source "${RRB_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}/scripts/00-lib.sh"
@@ -43,6 +43,19 @@ elif [[ -f "$STATE_CSV" ]]; then
   info "CSV_PATH 不存在，继续使用已保存的家宽 CSV：$STATE_CSV"
 else
   die "找不到家宽 CSV：$CSV_PATH，也找不到 $STATE_CSV"
+fi
+
+STATE_UPSTREAM_NODES="$RRB_STATE_DIR/upstream-nodes.txt"
+if [[ -f "$UPSTREAM_NODES_PATH" ]]; then
+  if is_dry_run; then
+    log "DRY-RUN: install -m 600 $UPSTREAM_NODES_PATH $STATE_UPSTREAM_NODES"
+  else
+    install -m 600 -o root -g root "$UPSTREAM_NODES_PATH" "$STATE_UPSTREAM_NODES"
+  fi
+elif [[ -f "$STATE_UPSTREAM_NODES" ]]; then
+  info "UPSTREAM_NODES_PATH 不存在，继续使用已保存的上游节点文件：$STATE_UPSTREAM_NODES"
+else
+  info "未配置 upstream-nodes.txt，仅使用 home-proxies.csv 和 direct 出口。"
 fi
 
 python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --config-env "$RRB_CONFIG_FILE" --check-only --quiet

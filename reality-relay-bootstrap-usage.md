@@ -34,17 +34,19 @@ rollback       -> 回滚 SSH 加固、sing-box 配置，可选处理 UFW
 1. **不要关闭当前已登录 SSH 窗口。**
 2. **`ssh-phase1` 不会禁 root，也不会禁密码。**
 3. **只有另开窗口确认 `admin` 可以用 SSH key 登录，并且 `sudo whoami` 输出 `root` 后，才执行 `ssh-final`。**
-4. **UFW 启用前必须先放行当前 SSH 端口。脚本会自动做，但服务商安全组仍要你手动确认。**
+4. **UFW 启用前必须先放行当前 SSH 端口。脚本会自动放行实际使用的中转端口，但服务商安全组仍要你手动确认。**
 5. **不要公开以下文件：**
 
 ```text
 config.env
 home-proxies.csv
+upstream-nodes.txt
 /etc/reality-relay-bootstrap/vless-uuid.txt
 /etc/reality-relay-bootstrap/reality-private.key
 /etc/reality-relay-bootstrap/reality-public.key
 /etc/reality-relay-bootstrap/reality-short-id.txt
 /etc/reality-relay-bootstrap/home-proxies.csv
+/etc/reality-relay-bootstrap/upstream-nodes.txt
 /root/reality-relay-bootstrap-nodes.txt
 /root/reality-relay-bootstrap-clash.yaml
 ```
@@ -54,7 +56,7 @@ home-proxies.csv
 
 ## 3.0 一键安装（推荐给首次使用）
 
-如果你希望尽量少编辑文件，可以直接使用 `install.sh`。它会用漂亮的交互式提示收集少量必要信息，然后自动生成 `config.env` 和 `home-proxies.csv`：
+如果你希望尽量少编辑文件，可以直接使用 `install.sh`。它会用漂亮的交互式提示收集少量必要信息，然后自动生成 `config.env`、`home-proxies.csv` 和 `upstream-nodes.txt`：
 
 ```bash
 bash <(wget -qO- https://raw.githubusercontent.com/suyi-92/reality-relay-bootstrap/main/install.sh)
@@ -83,14 +85,16 @@ sudo bash install.sh
 | `HOME_PORT_START` / `HOME_PORT_END` | `51043` / `51060` | 家宽入口端口范围 |
 | `ADMIN_PUBKEY` | 空回车结束 | 本地 SSH 公钥，可填写多个 |
 | `home-proxies.csv` | 可逐条提示，也可一次性粘贴多行 CSV | 家宽出口列表；字段顺序同模板 |
+| `upstream-nodes.txt` | 可选，空行结束 | 上游节点分享链接；支持 hysteria2 和 vless reality |
 
 注意事项：
 
 1. 脚本会把远程一键模式的项目目录放在 `/opt/reality-relay-bootstrap`；可通过 `RRB_INSTALL_DIR=/path bash <(wget ...)` 覆盖。
-2. 写出的 `config.env` 和 `home-proxies.csv` 权限会设置为 `600`，不要公开。
+2. 写出的 `config.env`、`home-proxies.csv` 和 `upstream-nodes.txt` 权限会设置为 `600`，不要公开。
 3. 选择一次性粘贴家宽代理时，可以带 `tag,listen_port,type,server,server_port,username,password,network` 表头；粘贴完成后输入空行结束。
-4. 执行到 `ssh-phase1` 后，脚本会停下来提示你另开窗口测试 admin key 登录；只有你确认成功后，才继续执行 `ssh-final`、fail2ban、sing-box、UFW、验证和节点输出。
-5. 如果只想生成配置、不自动跑部署阶段，可使用：
+4. 选择粘贴上游节点时，可以直接逐行粘贴 `hysteria2://` 或 `vless://` Reality 链接；也可以带 `tag,listen_port,node_url` 表头。
+5. 执行到 `ssh-phase1` 后，脚本会停下来提示你另开窗口测试 admin key 登录；只有你确认成功后，才继续执行 `ssh-final`、fail2ban、sing-box、UFW、验证和节点输出。
+6. 如果只想生成配置、不自动跑部署阶段，可使用：
 
 ```bash
 RRB_RUN_PHASES=false sudo bash install.sh
@@ -167,6 +171,7 @@ cd reality-relay-bootstrap
 
 cp config.example.env config.env
 cp home-proxies.example.csv home-proxies.csv
+cp upstream-nodes.example.txt upstream-nodes.txt
 ```
 
 编辑主配置：
@@ -193,6 +198,13 @@ nano home-proxies.csv
 cat home-proxies.csv
 ~~~
 
+可选：编辑上游节点文件：
+
+```bash
+nano upstream-nodes.txt
+```
+
+如果暂时没有上游节点，可以保持模板里的注释不动。
 
 ---
 
@@ -235,6 +247,7 @@ ENABLE_IPV6_LISTEN="false"
 ADMIN_SUDO_NOPASSWD="true"
 SFTP_PUBKEY=""
 CSV_PATH="./home-proxies.csv"
+UPSTREAM_NODES_PATH="./upstream-nodes.txt"
 RRB_STATE_DIR="/etc/reality-relay-bootstrap"
 SINGBOX_CONFIG_PATH="/etc/sing-box/config.json"
 
@@ -552,6 +565,39 @@ ctrl + x
 ~~~bash
 cat home-proxies.csv
 ~~~
+
+### 6.2 `upstream-nodes.txt`
+
+这是可选文件，用来把别人给你的节点分享链接接到本机新的 VLESS+Reality 入口端口。当前支持：
+
+```text
+hysteria2://...
+vless://...security=reality...
+```
+
+复制模板文件并打开编辑：
+
+~~~bash
+cp upstream-nodes.example.txt upstream-nodes.txt
+nano upstream-nodes.txt
+~~~
+
+推荐写成 CSV，端口由你明确指定：
+
+```csv
+tag,listen_port,node_url
+hy2-relay,51047,hysteria2://password@example.com:443?alpn=h3&insecure=1#hy2
+vless-relay,51048,vless://uuid@example.com:443?encryption=none&security=reality&flow=xtls-rprx-vision&type=tcp&sni=www.cloudflare.com&pbk=PUBLIC_KEY&fp=chrome#vless
+```
+
+也可以不写表头，只逐行放节点链接；脚本会自动分配 tag 和 `HOME_PORT_START` 到 `HOME_PORT_END` 范围内的空闲端口。
+
+规则：
+
+1. `listen_port` 不能与 `DIRECT_PORT`、`home-proxies.csv` 或其他上游节点重复。
+2. `listen_port` 必须在 `HOME_PORT_START` 和 `HOME_PORT_END` 范围内。
+3. 上游节点链接里包含密码、UUID、Reality public key 等连接信息，不要公开、不要提交到 GitHub。
+4. 这不是简单 TCP 转发；客户端连你的 VPS，VPS 再用 Hysteria2 或 VLESS Reality 连接上游节点。
 
 ---
 

@@ -116,11 +116,15 @@ spec.loader.exec_module(gen)
 base = env_path.parent
 env = gen.defaults(gen.parse_env_file(env_path))
 rows = gen.load_rows(env, base, allow_empty=True)
-if not rows:
+home_rows = [row for row in rows if row.get("source") == "home"]
+upstream_rows = [row for row in rows if row.get("source") == "upstream"]
+if not home_rows:
     print("没有家宽代理行，跳过代理本身测试。")
+    if upstream_rows:
+        print(f"上游节点 {len(upstream_rows)} 个：已通过 sing-box 配置和监听端口检查。")
     raise SystemExit(0)
 
-for row in rows:
+for row in home_rows:
     proto = "socks5h" if row["type"] in {"socks", "socks5"} else "http"
     proxy = f"{proto}://{row['server']}:{row['server_port']}"
     cmd = [

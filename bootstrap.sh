@@ -23,7 +23,7 @@ Phases:
   fail2ban        安装并配置 fail2ban
   singbox         安装 sing-box、生成 VLESS+Reality 多入口配置并重启
   subscription    安装/更新可选订阅端口
-  firewall        安装/配置 UFW，只开放 SSH、443 和 CSV 实际端口
+  firewall        安装/配置 UFW，只开放 SSH、443 和实际中转端口
   validate        验证 SSH、fail2ban、UFW、sing-box、监听端口和家宽代理
   output-nodes    生成 /root/reality-relay-bootstrap-nodes.txt 与 /root/reality-relay-bootstrap-clash.yaml
   rollback        回滚 SSH 加固、sing-box 配置；可选处理 UFW

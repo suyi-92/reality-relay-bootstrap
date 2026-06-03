@@ -7,9 +7,13 @@ cp config.example.env config.env
 nano config.env
 cp home-proxies.example.csv home-proxies.csv
 nano home-proxies.csv
+cp upstream-nodes.example.txt upstream-nodes.txt
+nano upstream-nodes.txt
 ```
 
 `443` 不写入 CSV。CSV 只管理 `51043` 起的家宽出口端口。字段顺序为 `tag,listen_port,type,server,server_port,username,password,network`；分步骤模式直接编辑 `home-proxies.csv`，一键模式可选择逐个填写或一次性粘贴多行 CSV（可带表头，空行结束）。
+
+`upstream-nodes.txt` 是可选文件，用来接入上游节点分享链接。支持 `hysteria2://` 和 `vless://...security=reality...`。可写 `tag,listen_port,node_url`，也可逐行只写节点链接让脚本自动分配端口。
 
 ## 2. SSH 初始化与加固
 
@@ -45,7 +49,7 @@ sudo bash bootstrap.sh --phase singbox
 此阶段会：
 
 1. 安装 sing-box。
-2. 复制 `home-proxies.csv` 到 `/etc/reality-relay-bootstrap/home-proxies.csv`。
+2. 复制 `home-proxies.csv` 到 `/etc/reality-relay-bootstrap/home-proxies.csv`，如果存在也会复制 `upstream-nodes.txt`。
 3. 生成 VLESS UUID、Reality keypair、short-id。
 4. 生成 `/etc/sing-box/config.json`。
 5. 执行 `sing-box check`。
@@ -58,7 +62,7 @@ sudo bash bootstrap.sh --phase singbox
 sudo bash bootstrap.sh --phase firewall
 ```
 
-UFW 只放行 SSH、`DIRECT_PORT`、CSV 中实际 `listen_port`。服务商安全组也要手动放行同样端口。
+UFW 只放行 SSH、`DIRECT_PORT`、`home-proxies.csv` 和 `upstream-nodes.txt` 中实际使用的 `listen_port`。服务商安全组也要手动放行同样端口。
 
 如果 `ENABLE_SUBSCRIPTION_SERVER=true`，还会放行 `SUBSCRIPTION_PORT`，默认是 `51040`。
 

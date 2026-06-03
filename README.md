@@ -9,7 +9,7 @@
 1. **不锁机优先**：SSH 拆成 phase1 和 final。phase1 只创建用户并开启公钥登录，不禁 root、不禁密码。只有另开窗口确认 admin key 登录成功后，才能用 `CONFIRM_ADMIN_KEY_LOGIN=yes` 执行 final。
 2. **先备份后修改**：SSH、fail2ban、UFW、sing-box 配置都会备份到 `/root/reality-relay-bootstrap-backups/`。
 3. **先检查后重启**：`sshd -t` 通过后才 reload SSH；`sing-box check -c /etc/sing-box/config.json` 通过后才 restart sing-box。
-4. **默认最小开放端口**：UFW 只放行当前 SSH 端口、`DIRECT_PORT`、CSV 里的实际 `listen_port`，不默认开放整个 51043-51060 范围。
+4. **默认最小开放端口**：UFW 只放行当前 SSH 端口、`DIRECT_PORT`、家宽 CSV 和上游节点里的实际 `listen_port`，不默认开放整个 51043-51060 范围。
 5. **敏感信息不进普通日志**：VLESS UUID、Reality 私钥、家宽代理密码不会打印到 `/var/log/reality-relay-bootstrap.log`。节点输出文件权限为 600。
 6. **233boy 可选且不强依赖**：默认使用 sing-box 官方 APT 源。只有显式启用 `USE_233BOY_INSTALLER=true` 并设置 `CONFIRM_USE_233BOY_INSTALLER=yes` 时才调用 233boy 安装脚本。调用后会隔离 `/etc/sing-box/conf`，由本项目接管 `/etc/sing-box/config.json`。
 
@@ -22,6 +22,7 @@ reality-relay-bootstrap/
   install.sh
   config.example.env
   home-proxies.example.csv
+  upstream-nodes.example.txt
   bootstrap.sh
   scripts/
     00-lib.sh
@@ -54,7 +55,7 @@ reality-relay-bootstrap/
 
 更详细的参数解释、Windows PowerShell 示例、回滚和客户端导入说明，请阅读 [`reality-relay-bootstrap-usage.md`](./reality-relay-bootstrap-usage.md)。
 
-如果是在全新 VPS 上使用推荐默认值部署，可以直接运行一键安装脚本。脚本会自动拉取/定位项目、生成 `config.env` 和 `home-proxies.csv`，会提示填写服务器 IPv4/IPv6、SSH、入口端口、是否重置密钥、订阅端口/格式、管理员公钥以及家宽代理 CSV 内容：
+如果是在全新 VPS 上使用推荐默认值部署，可以直接运行一键安装脚本。脚本会自动拉取/定位项目、生成 `config.env`、`home-proxies.csv` 和 `upstream-nodes.txt`，会提示填写服务器 IPv4/IPv6、SSH、入口端口、是否重置密钥、订阅端口/格式、管理员公钥、家宽代理 CSV 以及可选上游节点：
 
 ```bash
 bash <(wget -qO- https://raw.githubusercontent.com/suyi-92/reality-relay-bootstrap/main/install.sh)
@@ -66,7 +67,7 @@ bash <(wget -qO- https://raw.githubusercontent.com/suyi-92/reality-relay-bootstr
 sudo bash install.sh
 ```
 
-一键脚本仍然保留 SSH 二阶段安全确认：完成 `ssh-phase1` 后，需要你另开窗口确认 admin 公钥登录和 `sudo` 正常，才会继续执行 `ssh-final`。家宽代理既可以按提示逐个填写，也可以选择一次性粘贴多行 CSV；字段顺序与 `home-proxies.csv` 相同，支持带表头，粘贴后输入空行结束。
+一键脚本仍然保留 SSH 二阶段安全确认：完成 `ssh-phase1` 后，需要你另开窗口确认 admin 公钥登录和 `sudo` 正常，才会继续执行 `ssh-final`。家宽代理既可以按提示逐个填写，也可以选择一次性粘贴多行 CSV；上游节点可以直接逐行粘贴 `hysteria2://` 或 `vless://` Reality 分享链接，也可以粘贴 `tag,listen_port,node_url` CSV。
 
 ## 第一次使用
 
@@ -81,9 +82,14 @@ nano config.env
 
 cp home-proxies.example.csv home-proxies.csv
 nano home-proxies.csv
+
+cp upstream-nodes.example.txt upstream-nodes.txt
+nano upstream-nodes.txt
 ```
 
 `home-proxies.csv` 的字段顺序为 `tag,listen_port,type,server,server_port,username,password,network`。分步骤配置时可以直接编辑这个 CSV；一键安装时也可以把同样格式的多行 CSV 一次性粘贴进去。
+
+`upstream-nodes.txt` 用来把别人给你的上游代理节点接到新的中转入口端口。支持 `hysteria2://` 和 `vless://...security=reality...`，可以写成 `tag,listen_port,node_url`，也可以只放节点链接让脚本自动分配 tag 和端口。
 
 先 dry-run：
 
@@ -146,7 +152,7 @@ CLIENT_ALPN="h2,http/1.1"
 /etc/reality-relay-bootstrap/reality-short-id.txt
 ```
 
-这些文件权限为 600。`home-proxies.csv` 也会以 600 权限复制到 `/etc/reality-relay-bootstrap/home-proxies.csv`。不要公开 Reality 私钥、UUID、CSV 和节点文件。
+这些文件权限为 600。`home-proxies.csv` 和 `upstream-nodes.txt` 也会以 600 权限复制到 `/etc/reality-relay-bootstrap/`。不要公开 Reality 私钥、UUID、CSV、上游节点和节点文件。
 
 ## 443 模式
 
@@ -181,6 +187,18 @@ home-02,51044,http,proxy2.example.com,8080,user2,password2,tcp
 - `type` 只支持 `socks5` 或 `http`。
 - 密码里如果有英文逗号，必须用英文双引号包起来，例如 `"abc,123"`。
 - CSV 含有家宽代理账号密码，不要公开。
+
+## upstream-nodes.txt
+
+可选文件，用来把上游节点分享链接接入到新的 VLESS+Reality 入口端口：
+
+```csv
+tag,listen_port,node_url
+hy2-relay,51047,hysteria2://password@example.com:443?alpn=h3&insecure=1#hy2
+vless-relay,51048,vless://uuid@example.com:443?encryption=none&security=reality&flow=xtls-rprx-vision&type=tcp&sni=www.cloudflare.com&pbk=PUBLIC_KEY&fp=chrome#vless
+```
+
+也可以不写表头，只逐行放节点链接；脚本会从 `HOME_PORT_START` 到 `HOME_PORT_END` 的空闲端口中自动分配。当前第一版支持 Hysteria2 和 VLESS Reality 上游。
 
 ## 标准执行流程
 
@@ -239,9 +257,9 @@ sudo CONFIRM_USE_233BOY_INSTALLER=yes bash bootstrap.sh --phase singbox
 
 启用 233boy 后，本项目会隔离 `/etc/sing-box/conf` 为 `/etc/sing-box/conf.233boy.disabled.TIMESTAMP`，避免 233boy 默认 VLESS-REALITY 配置和本项目多入口配置同时生效。
 
-## 新增/删除家宽出口
+## 新增/删除出口
 
-新增：编辑 `home-proxies.csv`，增加一行新端口，然后执行：
+新增家宽 HTTP/SOCKS 出口时编辑 `home-proxies.csv`；新增上游节点出口时编辑 `upstream-nodes.txt`。改完后执行：
 
 ```bash
 sudo bash bootstrap.sh --phase singbox
@@ -374,6 +392,8 @@ sudo CONFIRM_ROLLBACK=yes RESTORE_233BOY_CONF=yes bash bootstrap.sh --phase roll
 - `/etc/reality-relay-bootstrap/vless-uuid.txt`
 - `/etc/reality-relay-bootstrap/reality-private.key`
 - `home-proxies.csv`
+- `upstream-nodes.txt`
 - `/etc/reality-relay-bootstrap/home-proxies.csv`
+- `/etc/reality-relay-bootstrap/upstream-nodes.txt`
 - `/root/reality-relay-bootstrap-nodes.txt`
 - `/root/reality-relay-bootstrap-clash.yaml`

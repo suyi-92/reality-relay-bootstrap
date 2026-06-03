@@ -1,5 +1,6 @@
 config.env
 home-proxies.csv
+upstream-nodes.txt
 *.log
 *.bak
 __pycache__/

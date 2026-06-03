@@ -56,7 +56,7 @@ banner() {
 ╭────────────────────────────────────────────────╮
 │            Reality Relay Bootstrap             │
 │              One-click installer               │
-│     Server, SSH key, and home proxies only     │
+│        Server, SSH key, and relay exits        │
 ╰────────────────────────────────────────────────╯
 BANNER
   printf '%b' "${RESET}"
@@ -295,6 +295,7 @@ ENABLE_IPV6_LISTEN=$(shell_quote "$enable_ipv6_listen")
 ADMIN_SUDO_NOPASSWD="true"
 SFTP_PUBKEY=""
 CSV_PATH="./home-proxies.csv"
+UPSTREAM_NODES_PATH="./upstream-nodes.txt"
 RRB_STATE_DIR="/etc/reality-relay-bootstrap"
 SINGBOX_CONFIG_PATH="/etc/sing-box/config.json"
 
@@ -334,6 +335,42 @@ write_home_proxies() {
     cat "$rows_file"
   } >"$project_dir/home-proxies.csv"
   chmod 600 "$project_dir/home-proxies.csv"
+}
+
+write_upstream_nodes() {
+  local project_dir="$1" rows_file="$2"
+  {
+    printf 'tag,listen_port,node_url\n'
+    cat "$rows_file"
+  } >"$project_dir/upstream-nodes.txt"
+  chmod 600 "$project_dir/upstream-nodes.txt"
+}
+
+tag_from_upstream_url() {
+  local url="$1" fallback="$2" tag=""
+  if [[ "$url" == *"#"* ]]; then
+    tag="${url##*#}"
+  fi
+  tag="$(printf '%s' "${tag:-$fallback}" | sed 's/%20/-/g; s/[^A-Za-z0-9_-]/-/g; s/^-*//; s/-*$//')"
+  [[ -n "$tag" ]] || tag="$fallback"
+  printf '%s\n' "$tag"
+}
+
+port_used_in_file() {
+  local port="$1" file="$2"
+  [[ -s "$file" ]] || return 1
+  awk -F',' -v port="$port" 'NF >= 2 && $2 == port { found=1 } END { exit found ? 0 : 1 }' "$file"
+}
+
+next_available_relay_port() {
+  local start="$1" end="$2" home_rows_file="$3" upstream_rows_file="$4" port
+  for (( port=start; port<=end; port++ )); do
+    port_used_in_file "$port" "$home_rows_file" && continue
+    port_used_in_file "$port" "$upstream_rows_file" && continue
+    printf '%s\n' "$port"
+    return 0
+  done
+  die "HOME_PORT_START/HOME_PORT_END 范围内没有可用端口；请扩大端口范围。"
 }
 
 collect_home_proxies_bulk() {
@@ -387,11 +424,59 @@ collect_home_proxies() {
   printf '%b\n' "${CYAN}${BOLD}家宽代理配置${RESET}"
   printf '%b\n' "${DIM}每一行会生成一个 VLESS+Reality 入口端口；如暂时没有家宽代理，可以不添加。${RESET}"
   if read_yes_no "是否一次性粘贴多行家宽代理 CSV？" no; then
-    collect_home_proxies_bulk "$rows_file" || warn "没有粘贴任何家宽代理行，将继续逐个输入。"
+    collect_home_proxies_bulk "$rows_file" || warn "没有粘贴任何家宽代理行。"
   fi
   if [[ ! -s "$rows_file" ]]; then
+    if read_yes_no "未添加家宽代理，是否跳过家宽代理配置？" yes; then
+      return 0
+    fi
     collect_home_proxies_one_by_one "$rows_file"
   fi
+}
+
+collect_upstream_nodes() {
+  local rows_file="$1" home_rows_file="$2" port_start="$3" port_end="$4"
+  local line_value any=false index=1
+  : >"$rows_file"
+
+  line
+  printf '%b\n' "${CYAN}${BOLD}上游节点配置${RESET}"
+  printf '%b\n' "${DIM}可选：把别人给你的 hysteria2:// 或 vless:// Reality 节点接到新的入口端口。${RESET}"
+  if ! read_yes_no "是否粘贴上游节点分享链接或 CSV？" no; then
+    return 0
+  fi
+
+  printf '%b\n' "${DIM}每行一个节点链接，脚本会自动分配端口；也支持 CSV：tag,listen_port,node_url。空行结束。${RESET}"
+  printf '%b\n' "${DIM}示例：hysteria2://password@1.2.3.4:443?alpn=h3&insecure=1#hy2${RESET}"
+  while true; do
+    printf '%b' "> " >"$INPUT_TTY"
+    IFS= read -r line_value <"$INPUT_TTY" || true
+    [[ -n "$line_value" ]] || break
+    [[ "$line_value" =~ ^[[:space:]]*# ]] && continue
+    if [[ "$line_value" =~ ^[[:space:]]*tag[[:space:]]*,[[:space:]]*listen_port[[:space:]]*, ]]; then
+      continue
+    fi
+    if [[ "$line_value" == *","* && "$line_value" =~ ^[^,]+,[0-9]+, ]]; then
+      printf '%s\n' "$line_value" >>"$rows_file"
+      any=true
+      index=$((index + 1))
+      continue
+    fi
+    case "$line_value" in
+      hysteria2://*|hy2://*|vless://*)
+        local tag port
+        tag="$(tag_from_upstream_url "$line_value" "upstream-$(printf '%02d' "$index")")"
+        port="$(next_available_relay_port "$port_start" "$port_end" "$home_rows_file" "$rows_file")"
+        printf '%s,%s,%s\n' "$(csv_escape "$tag")" "$(csv_escape "$port")" "$(csv_escape "$line_value")" >>"$rows_file"
+        any=true
+        index=$((index + 1))
+        ;;
+      *)
+        warn "暂不支持这一行；请粘贴 hysteria2://、vless://，或 tag,listen_port,node_url CSV。"
+        ;;
+    esac
+  done
+  [[ "$any" == "true" ]] || warn "未添加上游节点。"
 }
 
 run_install_flow() {
@@ -399,7 +484,7 @@ run_install_flow() {
   cd "$project_dir"
   line
   printf '%b\n' "${GREEN}${BOLD}配置文件已生成：${RESET}"
-  printf '  %s\n' "$project_dir/config.env" "$project_dir/home-proxies.csv"
+  printf '  %s\n' "$project_dir/config.env" "$project_dir/home-proxies.csv" "$project_dir/upstream-nodes.txt"
 
   if [[ "$RUN_PHASES" != "true" ]]; then
     warn "RRB_RUN_PHASES=$RUN_PHASES，仅生成配置，不执行部署阶段。"
@@ -495,13 +580,16 @@ main() {
 
   ADMIN_KEYS_FILE="$(mktemp)"
   ROWS_FILE="$(mktemp)"
-  trap 'rm -f "${ADMIN_KEYS_FILE:-}" "${ROWS_FILE:-}"' EXIT
+  UPSTREAM_ROWS_FILE="$(mktemp)"
+  trap 'rm -f "${ADMIN_KEYS_FILE:-}" "${ROWS_FILE:-}" "${UPSTREAM_ROWS_FILE:-}"' EXIT
   ADMIN_USER="$admin_user" collect_admin_pubkeys "$ADMIN_KEYS_FILE"
   admin_pubkey="$(cat "$ADMIN_KEYS_FILE")"
   collect_home_proxies "$ROWS_FILE"
+  collect_upstream_nodes "$UPSTREAM_ROWS_FILE" "$ROWS_FILE" "$home_port_start" "$home_port_end"
 
   write_config "$project_dir" "$server_alias" "$server_ip_ipv4" "$server_ip_ipv6" "$ssh_port" "$admin_user" "$admin_pubkey" "$direct_port" "$enable_subscription_server" "$subscription_port" "$subscription_target" "$reset_proxy_keys" "$home_port_start" "$home_port_end"
   write_home_proxies "$project_dir" "$ROWS_FILE"
+  write_upstream_nodes "$project_dir" "$UPSTREAM_ROWS_FILE"
   run_install_flow "$project_dir" "$server_ip_ipv4" "$server_ip_ipv6" "$ssh_port" "$admin_user" "$enable_subscription_server" "$subscription_port" "$subscription_target"
 }
 
