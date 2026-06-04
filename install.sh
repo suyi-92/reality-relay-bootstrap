@@ -506,7 +506,7 @@ run_install_flow() {
   bash bootstrap.sh --phase ssh-phase1
 
   line
-  printf '%b\n' "${YELLOW}${BOLD}安全确认：不要关闭当前 SSH 窗口。${RESET}"
+  printf '%b\n\n' "${YELLOW}${BOLD}安全确认：不要关闭当前 SSH 窗口。${RESET}"
   printf '请另开一个终端，确认下面命令可以通过 root 公钥登录：\n\n'
   if [[ -n "$server_ip_ipv4" ]]; then
     printf 'IPv4:\n'
