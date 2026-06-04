@@ -54,7 +54,13 @@ sudo bash bootstrap.sh --phase singbox
 4. 生成 `/etc/sing-box/config.json`。
 5. 执行 `sing-box check`。
 6. 通过后重启 sing-box。
-7. 输出 `/root/reality-relay-bootstrap-nodes.txt` 和 `/root/reality-relay-bootstrap-clash.yaml`。
+7. 如果 `ENABLE_SUBSCRIPTION_SERVER=true`，生成并启动订阅服务；不会默认输出 `/root` 节点文件。
+
+如需在服务器本地额外生成节点文件，可在部署完成后手动执行：
+
+```bash
+sudo bash bootstrap.sh --phase output-nodes
+```
 
 ## 5. 防火墙
 
@@ -71,3 +77,5 @@ UFW 只放行 SSH、`DIRECT_PORT`、`home-proxies.csv` 和 `upstream-nodes.txt` 
 ```bash
 sudo bash bootstrap.sh --phase validate
 ```
+
+`validate` 会测试家宽 HTTP/SOCKS 出口；对 `upstream-nodes.txt` 里的上游节点，会临时启动本地 socks 入口再通过对应 hy2/vless 上游访问 `https://ifconfig.me`。

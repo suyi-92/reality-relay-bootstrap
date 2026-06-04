@@ -1,33 +1,35 @@
 # 客户端配置与测试
 
-部署后生成：
-
-```bash
-/root/reality-relay-bootstrap-nodes.txt
-/root/reality-relay-bootstrap-clash.yaml
-```
-
-两个文件包含 VLESS UUID、Reality public key、short-id 等节点信息，权限为 600，不要公开。
-
-如果开启简单订阅端口：
+默认部署后启用订阅服务，不主动生成 `/root` 下的节点文件。默认订阅配置：
 
 ```bash
 ENABLE_SUBSCRIPTION_SERVER="true"
 SUBSCRIPTION_PORT="51040"
-SUBSCRIPTION_TARGET="ClashMeta"
+SUBSCRIPTION_TARGET="VLESS_REALITY"
 ```
 
-执行 `sudo bash bootstrap.sh --phase output-nodes` 后，Clash/Mihomo 可使用：
+订阅地址：
 
 ```text
-http://服务器IP:51040/sub/<VLESS_UUID>?target=ClashMeta
+http://服务器IP:51040/sub/<VLESS_UUID>?target=VLESS_REALITY
 ```
 
 `<VLESS_UUID>` 来自 `/etc/reality-relay-bootstrap/vless-uuid.txt`。内置订阅服务是 HTTP；如需 HTTPS，请在外层接入带证书的反向代理。
+
+如需在服务器本地额外生成节点文件：
+
+```bash
+sudo bash bootstrap.sh --phase output-nodes
+/root/reality-relay-bootstrap-nodes.txt
+/root/reality-relay-bootstrap-clash.yaml
+```
+
+这两个文件包含 VLESS UUID、Reality public key、short-id 等节点信息，权限为 600，不要公开。
+
 如果同时配置了 IPv4 和 IPv6，两个订阅链接都返回同一份完整节点；IPv4 节点名称保持不变，IPv6 节点名称追加 `-IPv6`。
 如果 Clash Verge 或浏览器无法导入 IPv6 字面量订阅地址，有 IPv4 时直接用 IPv4 订阅地址即可，它会返回同一份完整节点。
 
-`SUBSCRIPTION_TARGET` 支持 `ClashMeta`、`V2Ray`、`QX`、`ShadowRocket`。当前项目仍生成 VLESS+Reality 节点；非 ClashMeta target 输出 VLESS URI 订阅。
+`SUBSCRIPTION_TARGET` 支持 `VLESS_REALITY`、`ClashMeta`、`V2Ray`、`QX`、`ShadowRocket`。`VLESS_REALITY` 会输出标准 VLESS Reality URI 订阅。
 
 如果 `PROXY_IP_VERSION="ipv6"` 或 `PROXY_IP_VERSION="dual"`，生成的 Clash/Mihomo 配置会启用 `ipv6: true`；默认 `ipv4` 会保持 `ipv6: false`。
 

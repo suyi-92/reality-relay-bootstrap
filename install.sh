@@ -175,10 +175,11 @@ url_host() {
 }
 
 normalize_subscription_target() {
-  local raw="${1:-ClashMeta}" lower compact
+  local raw="${1:-VLESS_REALITY}" lower compact
   lower="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
   compact="$(printf '%s' "$lower" | tr -d ' _-')"
   case "$compact" in
+    vless|vlessreality|reality) printf 'VLESS_REALITY\n' ;;
     mihomo|clash|clashmeta) printf 'ClashMeta\n' ;;
     v2ray|v2rayn|v2rayng) printf 'V2Ray\n' ;;
     quantumultx|quanx|quantumult|qx) printf 'QX\n' ;;
@@ -195,12 +196,13 @@ read_subscription_target() {
       printf '%s\n' "$target"
       return 0
     fi
-    warn "$prompt 支持：ClashMeta、V2Ray、QX、ShadowRocket。"
+    warn "$prompt 支持：VLESS_REALITY、ClashMeta、V2Ray、QX、ShadowRocket。"
   done
 }
 
 subscription_target_label() {
   case "$1" in
+    VLESS_REALITY) printf 'VLESS Reality\n' ;;
     ClashMeta) printf 'ClashMeta\n' ;;
     V2Ray) printf 'V2Ray\n' ;;
     QX) printf 'QX\n' ;;
@@ -522,9 +524,7 @@ run_install_flow() {
   bash bootstrap.sh --phase validate
 
   line
-  printf '%b\n' "${GREEN}${BOLD}部署完成。节点文件：${RESET}"
-  printf '  sudo cat /root/reality-relay-bootstrap-nodes.txt\n'
-  printf '  sudo cat /root/reality-relay-bootstrap-clash.yaml\n'
+  printf '%b\n' "${GREEN}${BOLD}部署完成。${RESET}"
   if [[ "$enable_subscription_server" == "true" ]]; then
     local token target_label target_path
     token="$(subscription_token)"
@@ -546,7 +546,11 @@ run_install_flow() {
     printf '\n说明：订阅内容按 SERVER_IP_IPV4/SERVER_IP_IPV6 生成；如果两者都填写，IPv4/IPv6 链接都返回同一份完整节点，IPv6 节点名称追加 -IPv6。\n'
     printf '如客户端无法导入 IPv6 字面量订阅地址，有 IPv4 时直接使用 IPv4 订阅地址即可。\n'
     printf '内置订阅服务是 HTTP；如需 HTTPS，请在外层接入带证书的反向代理。\n'
+  else
+    printf '\n订阅服务未启用。\n'
   fi
+  printf '\n可选：如需在服务器本地生成节点文件，再执行：\n'
+  printf '  sudo bash bootstrap.sh --phase output-nodes\n'
 }
 
 main() {
@@ -564,13 +568,16 @@ main() {
   ssh_port="$(read_default "SSH_PORT" "22")"
   admin_user="$(read_default "ADMIN_USER" "admin")"
   direct_port="$(read_default "DIRECT_PORT" "443")"
+
+  line
+  printf '%b\n' "${CYAN}${BOLD}节点订阅配置${RESET}"
   reset_proxy_keys="$(read_bool_value "RESET_PROXY_KEYS" "false")"
   enable_subscription_server="$(read_bool_value "ENABLE_SUBSCRIPTION_SERVER" "true")"
   subscription_port="51040"
-  subscription_target="ClashMeta"
+  subscription_target="VLESS_REALITY"
   if [[ "$enable_subscription_server" == "true" ]]; then
     subscription_port="$(read_default "SUBSCRIPTION_PORT" "51040")"
-    subscription_target="$(read_subscription_target "SUBSCRIPTION_TARGET" "ClashMeta")"
+    subscription_target="$(read_subscription_target "SUBSCRIPTION_TARGET" "VLESS_REALITY")"
   fi
   home_port_start="$(read_default "HOME_PORT_START" "51043")"
   home_port_end="$(read_default "HOME_PORT_END" "51060")"

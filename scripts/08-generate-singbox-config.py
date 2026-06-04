@@ -93,6 +93,7 @@ AI_IP_CIDRS = [
 ]
 
 SUBSCRIPTION_TARGETS = {
+    "VLESS_REALITY",
     "ClashMeta",
     "V2Ray",
     "QX",
@@ -181,11 +182,11 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
         "CLIENT_UDP": "false",
         "CLIENT_ALPN": "h2,http/1.1",
         "CLASH_MIXED_PORT": "7890",
-        "ENABLE_SUBSCRIPTION_SERVER": "false",
+        "ENABLE_SUBSCRIPTION_SERVER": "true",
         "SUBSCRIPTION_PORT": "51040",
         "SUBSCRIPTION_DIR": f"{state_dir}/subscription",
         "RESET_PROXY_KEYS": "false",
-        "SUBSCRIPTION_TARGET": "ClashMeta",
+        "SUBSCRIPTION_TARGET": "VLESS_REALITY",
     }
     for k, v in d.items():
         merged.setdefault(k, v)
@@ -196,7 +197,7 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
         merged["SERVER_IP_IPV4"] = server_ip
     if not merged.get("SERVER_IP"):
         merged["SERVER_IP"] = merged.get("SERVER_IP_IPV4") or merged.get("SERVER_IP_IPV6") or ""
-    merged["SUBSCRIPTION_TARGET"] = normalize_subscription_target(merged.get("SUBSCRIPTION_TARGET", "ClashMeta"))
+    merged["SUBSCRIPTION_TARGET"] = normalize_subscription_target(merged.get("SUBSCRIPTION_TARGET", "VLESS_REALITY"))
 
     default_state_dir = "/etc/reality-relay-bootstrap"
     if merged["RRB_STATE_DIR"] != default_state_dir:
@@ -213,8 +214,11 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
 
 
 def normalize_subscription_target(value: str) -> str:
-    compact = re.sub(r"[\s_-]+", "", (value or "ClashMeta").lower())
+    compact = re.sub(r"[\s_-]+", "", (value or "VLESS_REALITY").lower())
     aliases = {
+        "vless": "VLESS_REALITY",
+        "vlessreality": "VLESS_REALITY",
+        "reality": "VLESS_REALITY",
         "mihomo": "ClashMeta",
         "clash": "ClashMeta",
         "clashmeta": "ClashMeta",
@@ -294,7 +298,7 @@ def validate_env(env: Dict[str, str]) -> None:
         "RESET_PROXY_KEYS",
     ]:
         as_bool(env, key)
-    normalize_subscription_target(env.get("SUBSCRIPTION_TARGET", "ClashMeta"))
+    normalize_subscription_target(env.get("SUBSCRIPTION_TARGET", "VLESS_REALITY"))
     if direct_port != 443:
         print(f"WARN: DIRECT_PORT={direct_port}，不是默认 443。", file=sys.stderr)
     if as_bool(env, "ENABLE_IPV6_LISTEN"):

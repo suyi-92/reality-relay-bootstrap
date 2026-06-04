@@ -13,6 +13,7 @@ SERVER_INSTALL_PATH="$SERVER_INSTALL_DIR/subscription-server.py"
 
 subscription_target_file() {
   case "$SUBSCRIPTION_TARGET" in
+    VLESS_REALITY) printf 'vless-reality.txt\n' ;;
     ClashMeta) printf 'clashmeta.yaml\n' ;;
     V2Ray) printf 'v2ray.txt\n' ;;
     QX) printf 'qx.txt\n' ;;
@@ -51,6 +52,8 @@ else
     --clash-out "$SUBSCRIPTION_DIR/all/clash.yaml"
     --subscription-target "$SUBSCRIPTION_TARGET"
     --subscription-out "$SUBSCRIPTION_DIR/all/$target_file"
+    --skip-node-files
+    --quiet
   )
   if [[ -n "$SERVER_IP_IPV4" && -n "$SERVER_IP_IPV6" ]]; then
     args+=(

@@ -55,7 +55,7 @@ reality-relay-bootstrap/
 
 更详细的参数解释、Windows PowerShell 示例、回滚和客户端导入说明，请阅读 [`reality-relay-bootstrap-usage.md`](./reality-relay-bootstrap-usage.md)。
 
-如果是在全新 VPS 上使用推荐默认值部署，可以直接运行一键安装脚本。脚本会自动拉取/定位项目、生成 `config.env`、`home-proxies.csv` 和 `upstream-nodes.txt`，会提示填写服务器 IPv4/IPv6、SSH、入口端口、是否重置密钥、订阅端口/格式、管理员公钥、家宽代理 CSV 以及可选上游节点：
+如果是在全新 VPS 上使用推荐默认值部署，可以直接运行一键安装脚本。脚本会自动拉取/定位项目、生成 `config.env`、`home-proxies.csv` 和 `upstream-nodes.txt`，会提示填写服务器 IPv4/IPv6、SSH、入口端口、节点订阅配置、管理员公钥、家宽代理 CSV 以及可选上游节点：
 
 ```bash
 bash <(wget -qO- https://raw.githubusercontent.com/suyi-92/reality-relay-bootstrap/main/install.sh)
@@ -214,7 +214,6 @@ sudo bash bootstrap.sh --phase fail2ban
 sudo bash bootstrap.sh --phase singbox
 sudo bash bootstrap.sh --phase firewall
 sudo bash bootstrap.sh --phase validate
-sudo bash bootstrap.sh --phase output-nodes
 ```
 
 ## SSH 二阶段说明
@@ -266,43 +265,47 @@ sudo CONFIRM_USE_233BOY_INSTALLER=yes bash bootstrap.sh --phase singbox
 sudo bash bootstrap.sh --phase singbox
 sudo bash bootstrap.sh --phase firewall
 sudo bash bootstrap.sh --phase validate
-sudo bash bootstrap.sh --phase output-nodes
 ```
 
 删除：从 CSV 删除对应行，再执行同样命令。UFW 会继续保留旧规则；如需删除旧端口规则，请用 `sudo ufw status numbered` 查看编号后手动删除。
 
-## 查看节点信息
+`validate` 会直接测试家宽 HTTP/SOCKS 代理；对 `upstream-nodes.txt` 里的 hy2/vless 节点，会临时启动本地 socks 入口并通过该上游访问 `https://ifconfig.me`。
 
-```bash
-sudo cat /root/reality-relay-bootstrap-nodes.txt
-sudo cat /root/reality-relay-bootstrap-clash.yaml
-```
+## 订阅和可选节点文件
 
-如果只想开一个简单订阅端口，在 `config.env` 设置：
+默认只启用简单订阅端口，不主动生成 `/root` 下的节点文件。在 `config.env` 设置：
 
 ```bash
 ENABLE_SUBSCRIPTION_SERVER="true"
 SUBSCRIPTION_PORT="51040"
-SUBSCRIPTION_TARGET="ClashMeta"
+SUBSCRIPTION_TARGET="VLESS_REALITY"
 ```
 
-然后执行：
+更新订阅服务：
 
 ```bash
-sudo bash bootstrap.sh --phase output-nodes
+sudo bash bootstrap.sh --phase subscription
 sudo bash bootstrap.sh --phase firewall
 ```
 
 订阅地址：
 
 ```text
-http://服务器IP:51040/sub/<VLESS_UUID>?target=ClashMeta
+http://服务器IP:51040/sub/<VLESS_UUID>?target=VLESS_REALITY
 ```
 
 内置服务是 HTTP，URL 里的 token 使用 `/etc/reality-relay-bootstrap/vless-uuid.txt`。仍建议只在服务商安全组里放行你的常用来源 IP。
-`SUBSCRIPTION_TARGET` 支持 `ClashMeta`、`V2Ray`、`QX`、`ShadowRocket`；默认只生成 ClashMeta。当前项目的节点协议仍是 VLESS+Reality，非 ClashMeta target 会输出 VLESS URI 订阅。
+`SUBSCRIPTION_TARGET` 支持 `VLESS_REALITY`、`ClashMeta`、`V2Ray`、`QX`、`ShadowRocket`；默认生成标准 VLESS Reality URI 订阅。
 如果同时配置了 IPv4 和 IPv6，两个订阅链接都返回同一份完整节点；IPv4 节点名称保持不变，IPv6 节点名称追加 `-IPv6`。
 如果 Clash Verge 或浏览器无法导入 IPv6 字面量订阅地址，有 IPv4 时直接用 IPv4 订阅地址即可，它会返回同一份完整节点。
+
+如需在服务器本地额外生成节点文件，再执行：
+
+```bash
+sudo bash bootstrap.sh --phase output-nodes
+sudo cat /root/reality-relay-bootstrap-nodes.txt
+sudo cat /root/reality-relay-bootstrap-clash.yaml
+```
 
 输出节点包括：
 

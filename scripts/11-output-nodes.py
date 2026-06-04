@@ -15,6 +15,7 @@ from urllib.parse import quote, urlencode
 
 
 SUBSCRIPTION_TARGETS = {
+    "VLESS_REALITY",
     "ClashMeta",
     "V2Ray",
     "QX",
@@ -39,8 +40,11 @@ def yaml_bool(value: bool) -> str:
 
 
 def normalize_subscription_target(value: str) -> str:
-    compact = re.sub(r"[\s_-]+", "", (value or "ClashMeta").lower())
+    compact = re.sub(r"[\s_-]+", "", (value or "VLESS_REALITY").lower())
     aliases = {
+        "vless": "VLESS_REALITY",
+        "vlessreality": "VLESS_REALITY",
+        "reality": "VLESS_REALITY",
         "mihomo": "ClashMeta",
         "clash": "ClashMeta",
         "clashmeta": "ClashMeta",
@@ -231,6 +235,23 @@ def node_to_vless_uri(node: Dict[str, Any]) -> str:
     return f"vless://{node['uuid']}@{uri_host(node['server'])}:{node['port']}?{query}#{quote(node['name'])}"
 
 
+def node_to_vless_reality_uri(node: Dict[str, Any]) -> str:
+    params = {
+        "type": "tcp",
+        "security": "reality",
+        "flow": node.get("flow", ""),
+        "fp": node["client-fingerprint"],
+        "sni": node["servername"],
+        "pbk": node["reality-opts"]["public-key"],
+        "sid": node["reality-opts"]["short-id"],
+        "spx": "/",
+    }
+    if not params["flow"]:
+        params.pop("flow")
+    query = urlencode(params)
+    return f"vless://{node['uuid']}@{uri_host(node['server'])}:{node['port']}?{query}#{quote(node['name'])}"
+
+
 def build_uri_subscription(nodes: List[Dict[str, Any]], *, base64_encode: bool) -> str:
     text = "\n".join(node_to_vless_uri(node) for node in nodes) + "\n"
     if not base64_encode:
@@ -240,6 +261,8 @@ def build_uri_subscription(nodes: List[Dict[str, Any]], *, base64_encode: bool) 
 
 def build_subscription_payload(target: str, clash_yaml: str, nodes: List[Dict[str, Any]]) -> str:
     target = normalize_subscription_target(target)
+    if target == "VLESS_REALITY":
+        return "\n".join(node_to_vless_reality_uri(node) for node in nodes) + "\n"
     if target == "ClashMeta":
         return clash_yaml
     if target == "V2Ray":
@@ -266,6 +289,8 @@ def main() -> int:
     ap.add_argument("--clash-ipv6", choices=["auto", "true", "false"], default="auto")
     ap.add_argument("--subscription-target", default="")
     ap.add_argument("--subscription-out", default="")
+    ap.add_argument("--quiet", action="store_true")
+    ap.add_argument("--skip-node-files", action="store_true")
     args = ap.parse_args()
 
     env_path = Path(args.config_env).resolve()
@@ -281,17 +306,18 @@ def main() -> int:
     nodes_text = "\n---\n".join(node_to_text(node) for node in nodes) + "\n"
     clash_yaml = build_clash_yaml(env, nodes, args.clash_ipv6)
 
-    for out, text in [(args.nodes_out, nodes_text), (args.clash_out, clash_yaml)]:
-        path = Path(out)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_name(path.name + ".tmp")
-        tmp.write_text(text, encoding="utf-8")
-        os.chmod(tmp, 0o600)
-        tmp.replace(path)
-        os.chmod(path, 0o600)
+    if not args.skip_node_files:
+        for out, text in [(args.nodes_out, nodes_text), (args.clash_out, clash_yaml)]:
+            path = Path(out)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_name(path.name + ".tmp")
+            tmp.write_text(text, encoding="utf-8")
+            os.chmod(tmp, 0o600)
+            tmp.replace(path)
+            os.chmod(path, 0o600)
 
     if args.subscription_out:
-        target = normalize_subscription_target(args.subscription_target or env.get("SUBSCRIPTION_TARGET", "ClashMeta"))
+        target = normalize_subscription_target(args.subscription_target or env.get("SUBSCRIPTION_TARGET", "VLESS_REALITY"))
         subscription_payload = build_subscription_payload(target, clash_yaml, nodes)
         path = Path(args.subscription_out)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -300,18 +326,20 @@ def main() -> int:
         os.chmod(tmp, 0o600)
         tmp.replace(path)
         os.chmod(path, 0o600)
-        print(f"已生成 {target} 订阅文件：{args.subscription_out}")
+        if not args.quiet:
+            print(f"已生成 {target} 订阅文件：{args.subscription_out}")
 
-    print(f"已生成节点文件：{args.nodes_out}")
-    print(f"已生成 Clash/Mihomo 文件：{args.clash_out}")
-    print("控制台脱敏摘要：")
-    for node in nodes:
-        print(
-            f"  {node['name']}: {node['server']}:{node['port']} "
-            f"servername={node['servername']} uuid={mask(node['uuid'])} "
-            f"reality-public-key={mask(node['reality-opts']['public-key'])} "
-            f"short-id={mask(node['reality-opts']['short-id'])} udp={str(node['udp']).lower()}"
-        )
+    if not args.quiet and not args.skip_node_files:
+        print(f"已生成节点文件：{args.nodes_out}")
+        print(f"已生成 Clash/Mihomo 文件：{args.clash_out}")
+        print("控制台脱敏摘要：")
+        for node in nodes:
+            print(
+                f"  {node['name']}: {node['server']}:{node['port']} "
+                f"servername={node['servername']} uuid={mask(node['uuid'])} "
+                f"reality-public-key={mask(node['reality-opts']['public-key'])} "
+                f"short-id={mask(node['reality-opts']['short-id'])} udp={str(node['udp']).lower()}"
+            )
     return 0
 
 

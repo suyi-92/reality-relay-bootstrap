@@ -17,8 +17,8 @@ ssh-final      -> 二阶段 SSH 最终加固，禁 root、禁密码、AllowUsers
 fail2ban       -> 安装并配置 fail2ban
 singbox        -> 安装 sing-box，生成 VLESS+Reality 多入口/多出口配置
 firewall       -> 安装/配置 UFW，只开放实际使用端口
-validate       -> 验证 SSH、fail2ban、UFW、sing-box、监听端口、家宽代理
-output-nodes   -> 生成客户端节点文件
+validate       -> 验证 SSH、fail2ban、UFW、sing-box、监听端口、家宽代理和上游节点
+output-nodes   -> 可选生成客户端节点文件
 subscription   -> 单独安装/更新简单订阅端口
 rollback       -> 回滚 SSH 加固、sing-box 配置，可选处理 UFW
 ```
@@ -81,7 +81,7 @@ sudo bash install.sh
 | `RESET_PROXY_KEYS` | `false` | 是否重置 VLESS UUID、Reality keypair 和 short-id |
 | `ENABLE_SUBSCRIPTION_SERVER` | `true` | 是否开启简单订阅端口 |
 | `SUBSCRIPTION_PORT` | `51040` | 订阅端口；仅开启订阅服务时询问 |
-| `SUBSCRIPTION_TARGET` | `ClashMeta` | 订阅格式；仅开启订阅服务时询问 |
+| `SUBSCRIPTION_TARGET` | `VLESS_REALITY` | 订阅格式；仅开启订阅服务时询问 |
 | `HOME_PORT_START` / `HOME_PORT_END` | `51043` / `51060` | 家宽入口端口范围 |
 | `ADMIN_PUBKEY` | 空回车结束 | 本地 SSH 公钥，可填写多个 |
 | `home-proxies.csv` | 可逐条提示，也可一次性粘贴多行 CSV | 家宽出口列表；字段顺序同模板 |
@@ -761,7 +761,7 @@ sudo bash bootstrap.sh --phase singbox
 - 生成 `/etc/sing-box/config.json`。
 - 执行 `sing-box check -c /etc/sing-box/config.json`。
 - check 通过后重启 sing-box。
-- 生成客户端节点文件。
+- 如果 `ENABLE_SUBSCRIPTION_SERVER=true`，生成并启动订阅服务。
 
 生成后的重要文件：
 
@@ -772,8 +772,7 @@ sudo bash bootstrap.sh --phase singbox
 /etc/reality-relay-bootstrap/reality-public.key
 /etc/reality-relay-bootstrap/reality-short-id.txt
 /etc/reality-relay-bootstrap/home-proxies.csv
-/root/reality-relay-bootstrap-nodes.txt
-/root/reality-relay-bootstrap-clash.yaml
+/etc/reality-relay-bootstrap/subscription/
 ```
 
 ### 8.7 配置 UFW 防火墙
@@ -828,11 +827,11 @@ sudo bash bootstrap.sh --phase validate
 - sing-box 配置语法
 - sing-box systemd 状态
 - sing-box 是否监听所有端口
-- 每个家宽代理本身是否可用
+- 每个家宽代理和上游节点本身是否可用
 
 ### 8.10 输出节点
 
-通常 `singbox` 阶段已经自动生成节点。需要重新生成时执行：
+默认部署只启用订阅服务，不主动生成 `/root` 下的节点文件。需要在服务器本地额外生成时执行：
 
 ```bash
 sudo bash bootstrap.sh --phase output-nodes
@@ -845,30 +844,30 @@ sudo cat /root/reality-relay-bootstrap-nodes.txt
 sudo cat /root/reality-relay-bootstrap-clash.yaml
 ```
 
-如需简单订阅端口，在 `config.env` 开启：
+默认订阅端口配置：
 
 ```bash
 ENABLE_SUBSCRIPTION_SERVER="true"
 SUBSCRIPTION_PORT="51040"
-SUBSCRIPTION_TARGET="ClashMeta"
+SUBSCRIPTION_TARGET="VLESS_REALITY"
 ```
 
-然后执行：
+更新订阅服务：
 
 ```bash
-sudo bash bootstrap.sh --phase output-nodes
+sudo bash bootstrap.sh --phase subscription
 sudo bash bootstrap.sh --phase firewall
 ```
 
 订阅地址：
 
 ```text
-http://服务器IP:51040/sub/<VLESS_UUID>?target=ClashMeta
+http://服务器IP:51040/sub/<VLESS_UUID>?target=VLESS_REALITY
 ```
 
 `<VLESS_UUID>` 来自 `/etc/reality-relay-bootstrap/vless-uuid.txt`。内置订阅服务是 HTTP；如需 HTTPS，请在外层接入带证书的反向代理。仍建议只在服务商安全组里放行你的常用来源 IP。
 
-`SUBSCRIPTION_TARGET` 支持 `ClashMeta`、`V2Ray`、`QX`、`ShadowRocket`；默认只生成 ClashMeta。当前项目仍生成 VLESS+Reality 节点，非 ClashMeta target 会输出 VLESS URI 订阅。
+`SUBSCRIPTION_TARGET` 支持 `VLESS_REALITY`、`ClashMeta`、`V2Ray`、`QX`、`ShadowRocket`；默认生成标准 VLESS Reality URI 订阅。
 
 如果同时配置了 IPv4 和 IPv6，两个订阅链接都返回同一份完整节点；IPv4 节点名称保持不变，IPv6 节点名称追加 `-IPv6`。
 如果 Clash Verge 或浏览器无法导入 IPv6 字面量订阅地址，有 IPv4 时直接用 IPv4 订阅地址即可，它会返回同一份完整节点。
@@ -898,7 +897,6 @@ sudo bash bootstrap.sh --phase fail2ban
 sudo bash bootstrap.sh --phase singbox
 sudo bash bootstrap.sh --phase firewall
 sudo bash bootstrap.sh --phase validate
-sudo bash bootstrap.sh --phase output-nodes
 ```
 
 ---

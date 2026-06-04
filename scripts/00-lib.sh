@@ -161,13 +161,13 @@ load_config() {
   : "${CLIENT_UDP:=false}"
   : "${CLIENT_ALPN:=h2,http/1.1}"
   : "${CLASH_MIXED_PORT:=7890}"
-  : "${ENABLE_SUBSCRIPTION_SERVER:=false}"
+  : "${ENABLE_SUBSCRIPTION_SERVER:=true}"
   : "${SUBSCRIPTION_PORT:=51040}"
   : "${SUBSCRIPTION_DIR:=/etc/reality-relay-bootstrap/subscription}"
   : "${RESET_PROXY_KEYS:=false}"
-  : "${SUBSCRIPTION_TARGET:=ClashMeta}"
+  : "${SUBSCRIPTION_TARGET:=VLESS_REALITY}"
   if ! SUBSCRIPTION_TARGET="$(normalize_subscription_target "$SUBSCRIPTION_TARGET")"; then
-    die "SUBSCRIPTION_TARGET 不支持：${SUBSCRIPTION_TARGET:-空}；可选：ClashMeta、V2Ray、QX、ShadowRocket"
+    die "SUBSCRIPTION_TARGET 不支持：${SUBSCRIPTION_TARGET:-空}；可选：VLESS_REALITY、ClashMeta、V2Ray、QX、ShadowRocket"
   fi
 
   validate_config_basics
@@ -216,10 +216,11 @@ url_host() {
 }
 
 normalize_subscription_target() {
-  local raw="${1:-ClashMeta}" lower compact
+  local raw="${1:-VLESS_REALITY}" lower compact
   lower="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
   compact="$(printf '%s' "$lower" | tr -d ' _-')"
   case "$compact" in
+    vless|vlessreality|reality) printf 'VLESS_REALITY\n' ;;
     mihomo|clash|clashmeta) printf 'ClashMeta\n' ;;
     v2ray|v2rayn|v2rayng) printf 'V2Ray\n' ;;
     quantumultx|quanx|quantumult|qx) printf 'QX\n' ;;
@@ -230,6 +231,7 @@ normalize_subscription_target() {
 
 subscription_target_label() {
   case "${1:-$SUBSCRIPTION_TARGET}" in
+    VLESS_REALITY) printf 'VLESS Reality\n' ;;
     ClashMeta) printf 'ClashMeta\n' ;;
     V2Ray) printf 'V2Ray\n' ;;
     QX) printf 'QX\n' ;;
