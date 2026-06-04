@@ -39,6 +39,8 @@ REQUIRED_UPSTREAM_COLUMNS = {
     "listen_port",
     "node_url",
 }
+HOME_PROXY_TYPES = {"socks5", "socks", "http"}
+UPSTREAM_SCHEMES = {"vless"}
 
 AI_DOMAINS = [
     "browser-intake-datadoghq.com",
@@ -358,6 +360,47 @@ def safe_tag(value: str, fallback: str, used_tags: set[str]) -> str:
     return candidate
 
 
+def normalize_home_csv_row(row: Dict[str, Any]) -> Dict[str, str]:
+    normalized = {k: (row.get(k) or "").strip() for k in REQUIRED_COLUMNS}
+
+    # Installer bulk mode has historically accepted old rows in this order:
+    # tag,listen_port,type,server,server_port,username,password,network
+    # If such a row is saved below the new header, remap it before validation.
+    if (
+        normalized["server"].lower() in HOME_PROXY_TYPES
+        and (not normalized["type"] or normalized["type"].isdigit())
+        and normalized["username"].isdigit()
+    ):
+        return {
+            "tag": normalized["tag"],
+            "listen_port": normalized["type"],
+            "type": normalized["server"],
+            "server": normalized["server_port"],
+            "server_port": normalized["username"],
+            "username": normalized["password"],
+            "password": normalized["network"],
+            "network": normalized["listen_port"] or "tcp",
+        }
+
+    return normalized
+
+
+def looks_like_upstream_url(value: str) -> bool:
+    return urlsplit((value or "").strip().replace("&amp;", "&")).scheme.lower() in UPSTREAM_SCHEMES
+
+
+def normalize_upstream_csv_row(row: Dict[str, Any]) -> Dict[str, str]:
+    normalized = {k: (row.get(k) or "").strip() for k in REQUIRED_UPSTREAM_COLUMNS}
+
+    # Compatibility for old rows in this order: tag,listen_port,node_url.
+    if looks_like_upstream_url(normalized["listen_port"]) and (
+        not normalized["node_url"] or normalized["node_url"].isdigit()
+    ):
+        normalized["node_url"], normalized["listen_port"] = normalized["listen_port"], normalized["node_url"]
+
+    return normalized
+
+
 def first_query_value(params: Dict[str, List[str]], *names: str) -> str:
     compact = {re.sub(r"[\s_-]+", "", key).lower(): values for key, values in params.items()}
     for name in names:
@@ -504,7 +547,7 @@ def load_home_rows(
     rows: List[Dict[str, Any]] = []
 
     for lineno, row in enumerate(reader, start=2):
-        normalized = {k: (v or "").strip() for k, v in row.items()}
+        normalized = normalize_home_csv_row(row)
         if not any(normalized.values()):
             continue
 
@@ -593,7 +636,7 @@ def load_upstream_rows(env: Dict[str, str], base: Path, used_tags: set[str], use
         iterable = []
         local_seen_ports: set[int] = set()
         for lineno, row in enumerate(reader, start=2):
-            normalized = {k: (v or "").strip() for k, v in row.items()}
+            normalized = normalize_upstream_csv_row(row)
             if not any(normalized.values()):
                 continue
             try:

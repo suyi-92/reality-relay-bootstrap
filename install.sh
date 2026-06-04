@@ -109,14 +109,30 @@ read_secret_default() {
 }
 
 read_yes_no() {
-  local prompt="$1" _default_value="${2:-yes}" value suffix="Y/n"
+  local prompt="$1" default_value="${2:-yes}" value suffix
+  case "${default_value,,}" in
+    y|yes|true|1)
+      default_value="yes"
+      suffix="Y/n"
+      ;;
+    n|no|false|0)
+      default_value="no"
+      suffix="y/N"
+      ;;
+    *)
+      die "read_yes_no 默认值必须是 yes 或 no，当前：$default_value"
+      ;;
+  esac
   while true; do
     printf '%b' "${BOLD}${prompt}${RESET} ${DIM}[${suffix}]${RESET}: " >"$INPUT_TTY"
     IFS= read -r value <"$INPUT_TTY" || true
-    [[ -z "$value" ]] && return 0
-    case "$value" in
-      y|Y|yes|YES|Yes) return 0 ;;
-      n|N|no|NO|No) return 1 ;;
+    if [[ -z "$value" ]]; then
+      [[ "$default_value" == "yes" ]]
+      return
+    fi
+    case "${value,,}" in
+      y|yes) return 0 ;;
+      n|no) return 1 ;;
       *) warn "请输入 yes 或 no。" ;;
     esac
   done
