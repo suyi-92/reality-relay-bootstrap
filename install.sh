@@ -577,7 +577,7 @@ main() {
 
   line
   printf '%b\n' "${CYAN}${BOLD}节点订阅配置${RESET}"
-  reset_proxy_keys="$(read_bool_value "RESET_PROXY_KEYS" "false")"
+  reset_proxy_keys="$(read_bool_value "RESET_PROXY_KEYS" "true")"
   enable_subscription_server="$(read_bool_value "ENABLE_SUBSCRIPTION_SERVER" "true")"
   subscription_port="51040"
   subscription_target="ClashMeta"
