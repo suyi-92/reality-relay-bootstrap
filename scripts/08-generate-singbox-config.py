@@ -303,8 +303,6 @@ def validate_env(env: Dict[str, str]) -> None:
     normalize_subscription_target(env.get("SUBSCRIPTION_TARGET", "ClashMeta"))
     if direct_port != 443:
         print(f"WARN: DIRECT_PORT={direct_port}，不是默认 443。", file=sys.stderr)
-    if as_bool(env, "ENABLE_IPV6_LISTEN"):
-        print("WARN: ENABLE_IPV6_LISTEN=true，将监听 ::，请确认 IPv6 暴露风险。", file=sys.stderr)
 
 
 def iter_csv_lines(path: Path) -> Iterable[str]:

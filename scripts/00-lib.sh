@@ -334,9 +334,6 @@ validate_config_basics() {
   if [[ "$DIRECT_PORT" != "443" ]]; then
     warn "DIRECT_PORT 当前不是 443：$DIRECT_PORT；请确认客户端和安全组同步。"
   fi
-  if [[ "$ENABLE_IPV6_LISTEN" == "true" ]]; then
-    warn "ENABLE_IPV6_LISTEN=true 会让 VLESS+Reality 监听 ::，请确认服务商 IPv6 安全组和 UFW v6 规则。"
-  fi
 }
 
 resolve_csv_path() {
