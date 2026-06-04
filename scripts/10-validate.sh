@@ -25,25 +25,39 @@ if [[ "$SINGBOX_ONLY" != "true" ]]; then
 
   if ! is_dry_run; then
     info "检查 sshd -T 最终生效值。"
-    "$(sshd_bin)" -T -C "user=${ADMIN_USER},host=localhost,addr=127.0.0.1" \
-      | grep -Ei '^(permitrootlogin|pubkeyauthentication|passwordauthentication|kbdinteractiveauthentication|challengeresponseauthentication|authenticationmethods|permitemptypasswords|allowusers|maxauthtries|x11forwarding|allowagentforwarding|allowtcpforwarding|permittunnel|gatewayports)\b' \
-      | tee -a "$LOG_FILE"
+    if [[ "$RRB_VERBOSE" == "true" ]]; then
+      "$(sshd_bin)" -T -C "user=${ADMIN_USER},host=localhost,addr=127.0.0.1" \
+        | grep -Ei '^(permitrootlogin|pubkeyauthentication|passwordauthentication|kbdinteractiveauthentication|challengeresponseauthentication|authenticationmethods|permitemptypasswords|allowusers|maxauthtries|x11forwarding|allowagentforwarding|allowtcpforwarding|permittunnel|gatewayports)\b' \
+        | tee -a "$LOG_FILE"
+    else
+      "$(sshd_bin)" -T -C "user=${ADMIN_USER},host=localhost,addr=127.0.0.1" \
+        | grep -Ei '^(permitrootlogin|pubkeyauthentication|passwordauthentication|kbdinteractiveauthentication|challengeresponseauthentication|authenticationmethods|permitemptypasswords|allowusers|maxauthtries|x11forwarding|allowagentforwarding|allowtcpforwarding|permittunnel|gatewayports)\b' \
+        >>"$LOG_FILE"
+    fi
   fi
 
   if [[ "$ENABLE_FAIL2BAN" == "true" ]]; then
     info "检查 fail2ban。"
     if ! is_dry_run; then
-      fail2ban-client -t 2>&1 | tee -a "$LOG_FILE"
+      fail2ban-client -t >>"$LOG_FILE" 2>&1
       systemctl is-active --quiet fail2ban || die "fail2ban 未运行"
       info "fail2ban 服务运行中。"
-      fail2ban-client status sshd 2>&1 | tee -a "$LOG_FILE" || true
+      if [[ "$RRB_VERBOSE" == "true" ]]; then
+        fail2ban-client status sshd 2>&1 | tee -a "$LOG_FILE" || true
+      else
+        fail2ban-client status sshd >>"$LOG_FILE" 2>&1 || true
+      fi
     fi
   fi
 
   if [[ "$ENABLE_UFW" == "true" ]]; then
     info "检查 UFW。"
     if ! is_dry_run; then
-      ufw status verbose 2>&1 | tee -a "$LOG_FILE"
+      if [[ "$RRB_VERBOSE" == "true" ]]; then
+        ufw status verbose 2>&1 | tee -a "$LOG_FILE"
+      else
+        ufw status verbose >>"$LOG_FILE" 2>&1
+      fi
     fi
   fi
 fi
@@ -126,7 +140,10 @@ env = gen.defaults(gen.parse_env_file(env_path))
 rows = gen.load_rows(env, base, allow_empty=True)
 home_rows = [row for row in rows if row.get("source") == "home"]
 upstream_rows = [row for row in rows if row.get("source") == "upstream"]
-if not home_rows:
+verbose = os.environ.get("RRB_VERBOSE", "false").lower() == "true"
+failures = []
+
+if not home_rows and verbose:
     print("没有家宽代理行，跳过代理本身测试。")
 
 for row in home_rows:
@@ -144,12 +161,17 @@ for row in home_rows:
     ]
     if row["username"] or row["password"]:
         cmd[7:7] = ["--proxy-user", f"{row['username']}:{row['password']}"]
-    print(f"测试 {row['tag']} ({row['type']}://{row['server']}:{row['server_port']}) ...", flush=True)
+    if verbose:
+        print(f"测试 {row['tag']} ({row['type']}://{row['server']}:{row['server_port']}) ...", flush=True)
     proc = subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if proc.returncode != 0:
-        print(proc.stderr.strip() or proc.stdout.strip(), file=sys.stderr)
-        raise SystemExit(f"家宽代理测试失败：{row['tag']}")
-    print(f"  出口 IP: {proc.stdout.strip()[:80]}")
+        failures.append(f"家宽代理测试失败：{row['tag']}")
+        print(f"WARN: 家宽代理测试失败：{row['tag']}；部署继续。", file=sys.stderr)
+        if verbose:
+            print(proc.stderr.strip() or proc.stdout.strip(), file=sys.stderr)
+        continue
+    if verbose:
+        print(f"  出口 IP: {proc.stdout.strip()[:80]}")
 
 
 def free_local_port() -> int:
@@ -232,11 +254,12 @@ def stop_proc(proc) -> str:
     return "\n".join(stderr.strip().splitlines()[-20:])
 
 
-if upstream_rows:
+if upstream_rows and verbose:
     print("测试每个上游节点本身是否可用；会临时启动本地 socks 入口。")
 for row in upstream_rows:
     port = free_local_port()
-    print(f"测试 {row['tag']} ({row['type']}://{row['server']}:{row['server_port']}) ...", flush=True)
+    if verbose:
+        print(f"测试 {row['tag']} ({row['type']}://{row['server']}:{row['server_port']}) ...", flush=True)
     with tempfile.TemporaryDirectory() as td:
         config_path = Path(td) / "sing-box-upstream-test.json"
         config_path.write_text(json.dumps(upstream_test_config(row, port), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -250,9 +273,11 @@ for row in upstream_rows:
         try:
             if not wait_local_port(port, proc):
                 stderr = stop_proc(proc)
-                if stderr:
+                failures.append(f"上游节点测试失败：{row['tag']}，临时 sing-box 未监听本地测试端口")
+                print(f"WARN: 上游节点测试失败：{row['tag']}；部署继续。", file=sys.stderr)
+                if stderr and verbose:
                     print(stderr, file=sys.stderr)
-                raise SystemExit(f"上游节点测试失败：{row['tag']}，临时 sing-box 未监听本地测试端口")
+                continue
             cmd = [
                 "curl",
                 "--silent",
@@ -266,15 +291,21 @@ for row in upstream_rows:
             curl_proc = subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             if curl_proc.returncode != 0:
                 stderr = stop_proc(proc)
-                print(curl_proc.stderr.strip() or curl_proc.stdout.strip(), file=sys.stderr)
-                if stderr:
+                failures.append(f"上游节点测试失败：{row['tag']}")
+                print(f"WARN: 上游节点测试失败：{row['tag']}；部署继续。", file=sys.stderr)
+                if verbose:
+                    print(curl_proc.stderr.strip() or curl_proc.stdout.strip(), file=sys.stderr)
+                if stderr and verbose:
                     print(stderr, file=sys.stderr)
-                raise SystemExit(f"上游节点测试失败：{row['tag']}")
-            print(f"  出口 IP: {curl_proc.stdout.strip()[:80]}")
+                continue
+            if verbose:
+                print(f"  出口 IP: {curl_proc.stdout.strip()[:80]}")
         finally:
             stop_proc(proc)
-if not upstream_rows:
+if not upstream_rows and verbose:
     print("没有上游节点行，跳过上游节点测试。")
+if failures:
+    print("WARN: 代理连通性检查存在失败项，仅告警不阻断：" + "；".join(failures), file=sys.stderr)
 PY
   fi
 fi

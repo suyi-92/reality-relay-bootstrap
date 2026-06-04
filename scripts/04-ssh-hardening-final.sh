@@ -146,12 +146,18 @@ fi
 rm -f /tmp/reality-relay-bootstrap-sshd-test.err
 test_sshd_config
 
-info "最终 sshd -T 生效值："
+info "检查最终 sshd -T 生效值。"
 if ! is_dry_run; then
   sshd="$(sshd_bin)"
-  "$sshd" -T -C "user=${ADMIN_USER},host=localhost,addr=127.0.0.1" \
-    | grep -Ei '^(permitrootlogin|pubkeyauthentication|passwordauthentication|kbdinteractiveauthentication|challengeresponseauthentication|authenticationmethods|permitemptypasswords|allowusers|maxauthtries|x11forwarding|allowagentforwarding|allowtcpforwarding|permittunnel|gatewayports)\b' \
-    | tee -a "$LOG_FILE"
+  if [[ "$RRB_VERBOSE" == "true" ]]; then
+    "$sshd" -T -C "user=${ADMIN_USER},host=localhost,addr=127.0.0.1" \
+      | grep -Ei '^(permitrootlogin|pubkeyauthentication|passwordauthentication|kbdinteractiveauthentication|challengeresponseauthentication|authenticationmethods|permitemptypasswords|allowusers|maxauthtries|x11forwarding|allowagentforwarding|allowtcpforwarding|permittunnel|gatewayports)\b' \
+      | tee -a "$LOG_FILE"
+  else
+    "$sshd" -T -C "user=${ADMIN_USER},host=localhost,addr=127.0.0.1" \
+      | grep -Ei '^(permitrootlogin|pubkeyauthentication|passwordauthentication|kbdinteractiveauthentication|challengeresponseauthentication|authenticationmethods|permitemptypasswords|allowusers|maxauthtries|x11forwarding|allowagentforwarding|allowtcpforwarding|permittunnel|gatewayports)\b' \
+      >>"$LOG_FILE"
+  fi
 fi
 
 if ! is_dry_run; then

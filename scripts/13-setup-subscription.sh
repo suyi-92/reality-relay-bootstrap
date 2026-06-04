@@ -13,11 +13,7 @@ SERVER_INSTALL_PATH="$SERVER_INSTALL_DIR/subscription-server.py"
 
 subscription_target_file() {
   case "$SUBSCRIPTION_TARGET" in
-    VLESS_REALITY) printf 'vless-reality.txt\n' ;;
     ClashMeta) printf 'clashmeta.yaml\n' ;;
-    V2Ray) printf 'v2ray.txt\n' ;;
-    QX) printf 'qx.txt\n' ;;
-    ShadowRocket) printf 'shadowrocket.txt\n' ;;
     *) die "SUBSCRIPTION_TARGET 不支持：$SUBSCRIPTION_TARGET" ;;
   esac
 }
@@ -100,20 +96,23 @@ fi
 
 token="$(subscription_token)"
 target_label="$(subscription_target_label "$SUBSCRIPTION_TARGET")"
-target_path="/sub/${token}?target=${SUBSCRIPTION_TARGET}"
+target_path="/sub/${token}?target=ClashMeta"
 
 cat <<EOF
 
 订阅服务已配置：
 
-$(if [[ -n "$(server_ipv4_hosts)" ]]; then
+$(if [[ -n "${SUBSCRIPTION_BASE_URL:-}" ]]; then
+  base="${SUBSCRIPTION_BASE_URL%/}"
+  printf '  %s:  %s%s\n' "$target_label" "$base" "$target_path"
+elif [[ -n "$(server_ipv4_hosts)" ]]; then
   printf 'IPv4:\n'
   for host in $(server_ipv4_hosts); do
     h="$(url_host "$host")"
     printf '  %s:  http://%s:%s%s\n' "$target_label" "$h" "$SUBSCRIPTION_PORT" "$target_path"
   done
 fi)
-$(if [[ -n "$(server_ipv6_hosts)" ]]; then
+$(if [[ -z "${SUBSCRIPTION_BASE_URL:-}" && -n "$(server_ipv6_hosts)" ]]; then
   printf '\nIPv6:\n'
   for host in $(server_ipv6_hosts); do
     h="$(url_host "$host")"

@@ -6,7 +6,8 @@ RRB_PROJECT_DIR="${RRB_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.
 RRB_CONFIG_FILE="${RRB_CONFIG_FILE:-$RRB_PROJECT_DIR/config.env}"
 RRB_DRY_RUN="${RRB_DRY_RUN:-false}"
 RRB_YES="${RRB_YES:-false}"
-export RRB_PROJECT_DIR RRB_CONFIG_FILE RRB_DRY_RUN RRB_YES
+RRB_VERBOSE="${RRB_VERBOSE:-false}"
+export RRB_PROJECT_DIR RRB_CONFIG_FILE RRB_DRY_RUN RRB_YES RRB_VERBOSE
 SCRIPT_DIR="$RRB_PROJECT_DIR/scripts"
 LOG_FILE="/var/log/reality-relay-bootstrap.log"
 BACKUP_ROOT="/root/reality-relay-bootstrap-backups"
@@ -21,10 +22,28 @@ fi
 trap 'rc=$?; echo "[ERROR] line=${LINENO} cmd=${BASH_COMMAND} rc=${rc}" >&2; exit $rc' ERR
 
 _ts() { date '+%F %T'; }
-log() { printf '[%s] %s\n' "$(_ts)" "$*" | tee -a "$LOG_FILE" >&2; }
+log() {
+  local line
+  line="[$(_ts)] $*"
+  printf '%s\n' "$line" >>"$LOG_FILE"
+  if [[ "$RRB_VERBOSE" == "true" ]]; then
+    printf '%s\n' "$line" >&2
+  fi
+}
 info() { log "INFO: $*"; }
-warn() { log "WARN: $*"; }
-die() { log "ERROR: $*"; exit 1; }
+warn() {
+  local line
+  line="[$(_ts)] WARN: $*"
+  printf '%s\n' "$line" >>"$LOG_FILE"
+  printf '%s\n' "$line" >&2
+}
+die() {
+  local line
+  line="[$(_ts)] ERROR: $*"
+  printf '%s\n' "$line" >>"$LOG_FILE"
+  printf '%s\n' "$line" >&2
+  exit 1
+}
 
 is_dry_run() { [[ "$RRB_DRY_RUN" == "true" ]]; }
 require_root() { [[ $EUID -eq 0 ]] || die "必须以 root 运行：sudo bash bootstrap.sh ..."; }
@@ -34,7 +53,11 @@ run() {
     log "DRY-RUN: $*"
   else
     log "+ $*"
-    "$@" 2>&1 | tee -a "$LOG_FILE"
+    if [[ "$RRB_VERBOSE" == "true" ]]; then
+      "$@" 2>&1 | tee -a "$LOG_FILE"
+    else
+      "$@" >>"$LOG_FILE" 2>&1
+    fi
   fi
 }
 
@@ -127,7 +150,7 @@ load_config() {
   : "${MODE_443:=direct}"
   : "${DIRECT_PORT:=443}"
   : "${HOME_PORT_START:=51043}"
-  : "${HOME_PORT_END:=51060}"
+  : "${HOME_PORT_END:=65535}"
   : "${ENABLE_UFW:=true}"
   : "${ENABLE_FAIL2BAN:=true}"
   : "${ENABLE_IPV6_LISTEN:=false}"
@@ -165,10 +188,13 @@ load_config() {
   : "${SUBSCRIPTION_PORT:=51040}"
   : "${SUBSCRIPTION_DIR:=/etc/reality-relay-bootstrap/subscription}"
   : "${RESET_PROXY_KEYS:=false}"
-  : "${SUBSCRIPTION_TARGET:=VLESS_REALITY}"
+  : "${SUBSCRIPTION_TARGET:=ClashMeta}"
+  : "${SUBSCRIPTION_BASE_URL:=}"
+  local raw_subscription_target="$SUBSCRIPTION_TARGET"
   if ! SUBSCRIPTION_TARGET="$(normalize_subscription_target "$SUBSCRIPTION_TARGET")"; then
-    die "SUBSCRIPTION_TARGET 不支持：${SUBSCRIPTION_TARGET:-空}；可选：VLESS_REALITY、ClashMeta、V2Ray、QX、ShadowRocket"
+    die "SUBSCRIPTION_TARGET 不支持：${SUBSCRIPTION_TARGET:-空}；当前只支持 ClashMeta"
   fi
+  warn_legacy_subscription_target "$raw_subscription_target"
 
   validate_config_basics
   resolve_csv_path
@@ -216,26 +242,29 @@ url_host() {
 }
 
 normalize_subscription_target() {
-  local raw="${1:-VLESS_REALITY}" lower compact
+  local raw="${1:-ClashMeta}" lower compact
   lower="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
   compact="$(printf '%s' "$lower" | tr -d ' _-')"
   case "$compact" in
-    vless|vlessreality|reality) printf 'VLESS_REALITY\n' ;;
     mihomo|clash|clashmeta) printf 'ClashMeta\n' ;;
-    v2ray|v2rayn|v2rayng) printf 'V2Ray\n' ;;
-    quantumultx|quanx|quantumult|qx) printf 'QX\n' ;;
-    shadowrocket) printf 'ShadowRocket\n' ;;
+    vless|vlessreality|reality|v2ray|v2rayn|v2rayng|quantumultx|quanx|quantumult|qx|shadowrocket) printf 'ClashMeta\n' ;;
     *) return 1 ;;
+  esac
+}
+
+warn_legacy_subscription_target() {
+  local raw="${1:-ClashMeta}" lower compact
+  lower="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
+  compact="$(printf '%s' "$lower" | tr -d ' _-')"
+  case "$compact" in
+    ""|mihomo|clash|clashmeta) ;;
+    *) warn "SUBSCRIPTION_TARGET=$raw 已废弃；当前只生成 ClashMeta/Mihomo 订阅。" ;;
   esac
 }
 
 subscription_target_label() {
   case "${1:-$SUBSCRIPTION_TARGET}" in
-    VLESS_REALITY) printf 'VLESS Reality\n' ;;
     ClashMeta) printf 'ClashMeta\n' ;;
-    V2Ray) printf 'V2Ray\n' ;;
-    QX) printf 'QX\n' ;;
-    ShadowRocket) printf 'ShadowRocket\n' ;;
     *) printf '%s\n' "${1:-$SUBSCRIPTION_TARGET}" ;;
   esac
 }
@@ -296,6 +325,7 @@ validate_config_basics() {
   fi
   [[ "$SUBSCRIPTION_DIR" == /* ]] || die "SUBSCRIPTION_DIR 必须是绝对路径"
   [[ "$SUBSCRIPTION_DIR" =~ ^/[A-Za-z0-9._/-]+$ ]] || die "SUBSCRIPTION_DIR 只能包含英文、数字、点、下划线、短横线和斜杠"
+  [[ -z "$SUBSCRIPTION_BASE_URL" || "$SUBSCRIPTION_BASE_URL" =~ ^https?://[^[:space:]]+$ ]] || die "SUBSCRIPTION_BASE_URL 必须以 http:// 或 https:// 开头"
   [[ "$VLESS_FLOW" == "" || "$VLESS_FLOW" == "xtls-rprx-vision" ]] || die "VLESS_FLOW 目前建议为空或 xtls-rprx-vision，当前：$VLESS_FLOW"
   [[ "$REALITY_SERVER_NAME" =~ ^[A-Za-z0-9._-]+$ ]] || die "REALITY_SERVER_NAME 不合法：$REALITY_SERVER_NAME"
   [[ "$REALITY_HANDSHAKE_SERVER" =~ ^[A-Za-z0-9._-]+$ ]] || die "REALITY_HANDSHAKE_SERVER 不合法：$REALITY_HANDSHAKE_SERVER"

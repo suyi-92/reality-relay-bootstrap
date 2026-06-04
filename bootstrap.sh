@@ -10,11 +10,12 @@ PHASE=""
 RRB_CONFIG_FILE="$PROJECT_DIR/config.env"
 RRB_DRY_RUN="false"
 RRB_YES="false"
-export RRB_CONFIG_FILE RRB_DRY_RUN RRB_YES
+RRB_VERBOSE="${RRB_VERBOSE:-false}"
+export RRB_CONFIG_FILE RRB_DRY_RUN RRB_YES RRB_VERBOSE
 
 usage() {
   cat <<'EOF'
-Usage: sudo bash bootstrap.sh --phase <phase> [--config config.env] [--dry-run] [--yes]
+Usage: sudo bash bootstrap.sh --phase <phase> [--config config.env] [--dry-run] [--yes] [--verbose]
 
 Phases:
   preflight       检测系统、配置和 SSH 基础条件
@@ -36,6 +37,7 @@ while [[ $# -gt 0 ]]; do
     --config) RRB_CONFIG_FILE="${2:-}"; export RRB_CONFIG_FILE; shift 2 ;;
     --dry-run) RRB_DRY_RUN="true"; export RRB_DRY_RUN; shift ;;
     --yes|-y) RRB_YES="true"; export RRB_YES; shift ;;
+    --verbose) RRB_VERBOSE="true"; export RRB_VERBOSE; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; usage; exit 2 ;;
   esac

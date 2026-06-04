@@ -18,6 +18,9 @@ REPO_URL="${RRB_REPO_URL:-https://github.com/suyi-92/reality-relay-bootstrap.git
 INSTALL_DIR="${RRB_INSTALL_DIR:-/opt/reality-relay-bootstrap}"
 DEFAULT_BRANCH="${RRB_BRANCH:-main}"
 RUN_PHASES="${RRB_RUN_PHASES:-true}"
+RRB_VERBOSE="${RRB_VERBOSE:-false}"
+INSTALL_LOG_FILE="${RRB_INSTALL_LOG_FILE:-/tmp/reality-relay-bootstrap-install.log}"
+export RRB_VERBOSE
 
 if [[ ${EUID:-$(id -u)} -ne 0 ]]; then
   echo "ERROR: 请使用 root 运行，例如：sudo bash install.sh" >&2
@@ -48,6 +51,14 @@ line() { printf '%b\n' "${DIM}────────────────�
 info() { printf '%b\n' "${BLUE}INFO${RESET} $*" >&2; }
 warn() { printf '%b\n' "${YELLOW}WARN${RESET} $*" >&2; }
 die() { printf '%b\n' "${RED}ERROR${RESET} $*" >&2; exit 1; }
+
+run_logged() {
+  if [[ "$RRB_VERBOSE" == "true" ]]; then
+    "$@"
+  else
+    "$@" >>"$INSTALL_LOG_FILE" 2>&1
+  fi
+}
 
 banner() {
   clear_screen
@@ -175,38 +186,19 @@ url_host() {
 }
 
 normalize_subscription_target() {
-  local raw="${1:-VLESS_REALITY}" lower compact
+  local raw="${1:-ClashMeta}" lower compact
   lower="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
   compact="$(printf '%s' "$lower" | tr -d ' _-')"
   case "$compact" in
-    vless|vlessreality|reality) printf 'VLESS_REALITY\n' ;;
     mihomo|clash|clashmeta) printf 'ClashMeta\n' ;;
-    v2ray|v2rayn|v2rayng) printf 'V2Ray\n' ;;
-    quantumultx|quanx|quantumult|qx) printf 'QX\n' ;;
-    shadowrocket) printf 'ShadowRocket\n' ;;
+    vless|vlessreality|reality|v2ray|v2rayn|v2rayng|quantumultx|quanx|quantumult|qx|shadowrocket) printf 'ClashMeta\n' ;;
     *) return 1 ;;
   esac
 }
 
-read_subscription_target() {
-  local prompt="$1" default_value="$2" value target
-  while true; do
-    value="$(read_default "$prompt" "$default_value")"
-    if target="$(normalize_subscription_target "$value")"; then
-      printf '%s\n' "$target"
-      return 0
-    fi
-    warn "$prompt 支持：VLESS_REALITY、ClashMeta、V2Ray、QX、ShadowRocket。"
-  done
-}
-
 subscription_target_label() {
   case "$1" in
-    VLESS_REALITY) printf 'VLESS Reality\n' ;;
     ClashMeta) printf 'ClashMeta\n' ;;
-    V2Ray) printf 'V2Ray\n' ;;
-    QX) printf 'QX\n' ;;
-    ShadowRocket) printf 'ShadowRocket\n' ;;
     *) printf '%s\n' "$1" ;;
   esac
 }
@@ -249,12 +241,12 @@ ensure_project() {
 
   if [[ -d "$INSTALL_DIR/.git" ]]; then
     info "检测到已有项目目录，拉取最新代码。"
-    git -C "$INSTALL_DIR" fetch --all --prune >&2
-    git -C "$INSTALL_DIR" checkout "$DEFAULT_BRANCH" >&2
-    git -C "$INSTALL_DIR" pull --ff-only >&2
+    run_logged git -C "$INSTALL_DIR" fetch --all --prune
+    run_logged git -C "$INSTALL_DIR" checkout "$DEFAULT_BRANCH"
+    run_logged git -C "$INSTALL_DIR" pull --ff-only
   else
     mkdir -p "$(dirname "$INSTALL_DIR")"
-    git clone --branch "$DEFAULT_BRANCH" "$REPO_URL" "$INSTALL_DIR" >&2
+    run_logged git clone --branch "$DEFAULT_BRANCH" "$REPO_URL" "$INSTALL_DIR"
   fi
   printf '%s\n' "$INSTALL_DIR"
 }
@@ -325,6 +317,7 @@ CLASH_MIXED_PORT="7890"
 ENABLE_SUBSCRIPTION_SERVER=$(shell_quote "$enable_subscription_server")
 SUBSCRIPTION_PORT=$(shell_quote "$subscription_port")
 SUBSCRIPTION_TARGET=$(shell_quote "$subscription_target")
+SUBSCRIPTION_BASE_URL=""
 SUBSCRIPTION_DIR="/etc/reality-relay-bootstrap/subscription"
 EOF_CONFIG
   chmod 600 "$project_dir/config.env"
@@ -333,7 +326,7 @@ EOF_CONFIG
 write_home_proxies() {
   local project_dir="$1" rows_file="$2"
   {
-    printf 'tag,listen_port,type,server,server_port,username,password,network\n'
+    printf 'tag,type,server,server_port,username,password,network,listen_port\n'
     cat "$rows_file"
   } >"$project_dir/home-proxies.csv"
   chmod 600 "$project_dir/home-proxies.csv"
@@ -342,7 +335,7 @@ write_home_proxies() {
 write_upstream_nodes() {
   local project_dir="$1" rows_file="$2"
   {
-    printf 'tag,listen_port,node_url\n'
+    printf 'tag,node_url,listen_port\n'
     cat "$rows_file"
   } >"$project_dir/upstream-nodes.txt"
   chmod 600 "$project_dir/upstream-nodes.txt"
@@ -377,8 +370,8 @@ next_available_relay_port() {
 
 collect_home_proxies_bulk() {
   local rows_file="$1" line_value any=false
-  printf '%b\n' "${DIM}可直接粘贴多行 CSV，字段为：tag,listen_port,type,server,server_port,username,password,network${RESET}"
-  printf '%b\n' "${DIM}支持带表头；粘贴完成后输入空行结束。密码可留空，例如：home-01,51043,socks5,1.2.3.4,1080,,secret,tcp${RESET}"
+  printf '%b\n' "${DIM}可直接粘贴多行 CSV，字段为：tag,type,server,server_port,username,password,network,listen_port${RESET}"
+  printf '%b\n' "${DIM}支持带表头；粘贴完成后输入空行结束。listen_port 可留空自动分配，例如：home-01,socks5,1.2.3.4,1080,,secret,tcp,${RESET}"
   while true; do
     printf '%b' "> " >"$INPUT_TTY"
     IFS= read -r line_value <"$INPUT_TTY" || true
@@ -398,23 +391,23 @@ collect_home_proxies_one_by_one() {
   while read_yes_no "是否添加第 ${index} 个家宽代理出口？" "$([[ $index -eq 1 ]] && echo yes || echo no)"; do
     local tag listen_port type server server_port username password network
     tag="$(read_default "  tag" "home-$(printf '%02d' "$index")")"
-    listen_port="$(read_default "  listen_port" "$((51042 + index))")"
     type="$(read_default "  type (socks5/http)" "socks5")"
     server="$(read_default "  server" "")"
     server_port="$(read_default "  server_port" "1080")"
     username="$(read_default "  username" "")"
     password="$(read_secret_default "  password" "")"
     network="$(read_default "  network" "tcp")"
+    listen_port="$(read_default "  listen_port (留空自动分配)" "")"
     [[ -n "$server" ]] || die "家宽代理 server 不能为空；如没有代理，请重新运行并选择不添加。"
     printf '%s,%s,%s,%s,%s,%s,%s,%s\n' \
       "$(csv_escape "$tag")" \
-      "$(csv_escape "$listen_port")" \
       "$(csv_escape "$type")" \
       "$(csv_escape "$server")" \
       "$(csv_escape "$server_port")" \
       "$(csv_escape "$username")" \
       "$(csv_escape "$password")" \
-      "$(csv_escape "$network")" >>"$rows_file"
+      "$(csv_escape "$network")" \
+      "$(csv_escape "$listen_port")" >>"$rows_file"
     index=$((index + 1))
   done
 }
@@ -443,38 +436,37 @@ collect_upstream_nodes() {
 
   line
   printf '%b\n' "${CYAN}${BOLD}上游节点配置${RESET}"
-  printf '%b\n' "${DIM}可选：把别人给你的 hysteria2://、普通 vless:// 或 VLESS Reality 节点接到新的入口端口。${RESET}"
+  printf '%b\n' "${DIM}可选：把别人给你的普通 vless:// 或 VLESS Reality 节点接到新的入口端口。${RESET}"
   if ! read_yes_no "是否粘贴上游节点分享链接或 CSV？" no; then
     return 0
   fi
 
-  printf '%b\n' "${DIM}每行一个节点链接，脚本会自动分配端口；也支持 CSV：tag,listen_port,node_url。空行结束。${RESET}"
-  printf '%b\n' "${DIM}示例：hysteria2://password@1.2.3.4:443?alpn=h3&insecure=1#hy2${RESET}"
+  printf '%b\n' "${DIM}每行一个 vless:// 节点链接，脚本会自动分配端口；也支持 CSV：tag,node_url,listen_port。空行结束。${RESET}"
+  printf '%b\n' "${DIM}示例：vless://uuid@example.com:443?type=tcp&security=reality&flow=xtls-rprx-vision&fp=chrome&sni=www.microsoft.com&pbk=xxx&sid=abcd&spx=%2F#relay${RESET}"
   while true; do
     printf '%b' "> " >"$INPUT_TTY"
     IFS= read -r line_value <"$INPUT_TTY" || true
     [[ -n "$line_value" ]] || break
     [[ "$line_value" =~ ^[[:space:]]*# ]] && continue
-    if [[ "$line_value" =~ ^[[:space:]]*tag[[:space:]]*,[[:space:]]*listen_port[[:space:]]*, ]]; then
+    if [[ "$line_value" =~ ^[[:space:]]*tag[[:space:]]*, ]]; then
       continue
     fi
-    if [[ "$line_value" == *","* && "$line_value" =~ ^[^,]+,[0-9]+, ]]; then
+    if [[ "$line_value" =~ ^[^,]+,[[:space:]]*vless:// || "$line_value" =~ ^[^,]+,[[:space:]]*[0-9]+,[[:space:]]*vless:// ]]; then
       printf '%s\n' "$line_value" >>"$rows_file"
       any=true
       index=$((index + 1))
       continue
     fi
     case "$line_value" in
-      hysteria2://*|hy2://*|vless://*)
-        local tag port
+      vless://*)
+        local tag
         tag="$(tag_from_upstream_url "$line_value" "upstream-$(printf '%02d' "$index")")"
-        port="$(next_available_relay_port "$port_start" "$port_end" "$home_rows_file" "$rows_file")"
-        printf '%s,%s,%s\n' "$(csv_escape "$tag")" "$(csv_escape "$port")" "$(csv_escape "$line_value")" >>"$rows_file"
+        printf '%s,%s,\n' "$(csv_escape "$tag")" "$(csv_escape "$line_value")" >>"$rows_file"
         any=true
         index=$((index + 1))
         ;;
       *)
-        warn "暂不支持这一行；请粘贴 hysteria2://、vless://，或 tag,listen_port,node_url CSV。"
+        warn "暂不支持这一行；请粘贴 vless://，或 tag,node_url,listen_port CSV。"
         ;;
     esac
   done
@@ -574,13 +566,12 @@ main() {
   reset_proxy_keys="$(read_bool_value "RESET_PROXY_KEYS" "false")"
   enable_subscription_server="$(read_bool_value "ENABLE_SUBSCRIPTION_SERVER" "true")"
   subscription_port="51040"
-  subscription_target="VLESS_REALITY"
+  subscription_target="ClashMeta"
   if [[ "$enable_subscription_server" == "true" ]]; then
     subscription_port="$(read_default "SUBSCRIPTION_PORT" "51040")"
-    subscription_target="$(read_subscription_target "SUBSCRIPTION_TARGET" "VLESS_REALITY")"
   fi
   home_port_start="$(read_default "HOME_PORT_START" "51043")"
-  home_port_end="$(read_default "HOME_PORT_END" "51060")"
+  home_port_end="65535"
 
   [[ -n "$server_alias" ]] || die "SERVER_ALIAS 不能为空。"
   [[ -n "$server_ip_ipv4" || -n "$server_ip_ipv6" ]] || die "SERVER_IP_IPv4 和 SERVER_IP_IPv6 至少填写一个。"

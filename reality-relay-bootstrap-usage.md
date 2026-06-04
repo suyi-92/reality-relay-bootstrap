@@ -81,18 +81,18 @@ sudo bash install.sh
 | `RESET_PROXY_KEYS` | `false` | 是否重置 VLESS UUID、Reality keypair 和 short-id |
 | `ENABLE_SUBSCRIPTION_SERVER` | `true` | 是否开启简单订阅端口 |
 | `SUBSCRIPTION_PORT` | `51040` | 订阅端口；仅开启订阅服务时询问 |
-| `SUBSCRIPTION_TARGET` | `VLESS_REALITY` | 订阅格式；仅开启订阅服务时询问 |
-| `HOME_PORT_START` / `HOME_PORT_END` | `51043` / `51060` | 家宽入口端口范围 |
+| `SUBSCRIPTION_TARGET` | `ClashMeta` | 当前只生成 ClashMeta/Mihomo YAML |
+| `HOME_PORT_START` | `51043` | 出口入口端口自动分配起点 |
 | `ADMIN_PUBKEY` | 空回车结束 | 本地 SSH 公钥，可填写多个 |
 | `home-proxies.csv` | 可逐条提示，也可一次性粘贴多行 CSV | 家宽出口列表；字段顺序同模板 |
-| `upstream-nodes.txt` | 可选，空行结束 | 上游节点分享链接；支持 hysteria2、vless plain 和 vless reality |
+| `upstream-nodes.txt` | 可选，空行结束 | 上游节点分享链接；支持 vless plain 和 vless reality |
 
 注意事项：
 
 1. 脚本会把远程一键模式的项目目录放在 `/opt/reality-relay-bootstrap`；可通过 `RRB_INSTALL_DIR=/path bash <(wget ...)` 覆盖。
 2. 写出的 `config.env`、`home-proxies.csv` 和 `upstream-nodes.txt` 权限会设置为 `600`，不要公开。
-3. 选择一次性粘贴家宽代理时，可以带 `tag,listen_port,type,server,server_port,username,password,network` 表头；粘贴完成后输入空行结束。
-4. 选择粘贴上游节点时，可以直接逐行粘贴 `hysteria2://`、普通 `vless://` 或 VLESS Reality 链接；也可以带 `tag,listen_port,node_url` 表头。
+3. 选择一次性粘贴家宽代理时，可以带 `tag,type,server,server_port,username,password,network,listen_port` 表头；`listen_port` 可留空，粘贴完成后输入空行结束。
+4. 选择粘贴上游节点时，可以直接逐行粘贴普通 `vless://` 或 VLESS Reality 链接；也可以带 `tag,node_url,listen_port` 表头。
 5. 执行到 `ssh-phase1` 后，脚本会停下来提示你另开窗口测试 admin key 登录；只有你确认成功后，才继续执行 `ssh-final`、fail2ban、sing-box、UFW、验证和节点输出。
 6. 如果只想生成配置、不自动跑部署阶段，可使用：
 
@@ -239,7 +239,7 @@ INSTALL_SINGBOX_METHOD="apt"
 MODE_443="direct"
 DIRECT_PORT="443"
 HOME_PORT_START="51043"
-HOME_PORT_END="51060"
+HOME_PORT_END="65535"
 ENABLE_UFW="true"
 ENABLE_FAIL2BAN="true"
 ENABLE_IPV6_LISTEN="false"
@@ -415,7 +415,7 @@ SMART_AI_HOME_TAG="home-us"
 ```bash
 DIRECT_PORT="443"
 HOME_PORT_START="51043"
-HOME_PORT_END="51060"
+HOME_PORT_END="65535"
 ```
 
 规则：
@@ -520,9 +520,9 @@ nano home-proxies.csv
 CSV 示例：
 
 ```csv
-tag,listen_port,type,server,server_port,username,password,network
-home-01,51043,socks5,proxy1.example.com,1080,user1,"pass,with,comma",tcp
-home-02,51044,http,proxy2.example.com,8080,user2,password2,tcp
+tag,type,server,server_port,username,password,network,listen_port
+home-01,socks5,proxy1.example.com,1080,user1,"pass,with,comma",tcp,
+home-02,http,proxy2.example.com,8080,user2,password2,tcp,51044
 ```
 
 字段说明：
@@ -530,7 +530,7 @@ home-02,51044,http,proxy2.example.com,8080,user2,password2,tcp
 | 字段 | 说明 | 示例 |
 |---|---|---|
 | `tag` | 家宽出口名称，只能用英文、数字、下划线、短横线 | `home-01` |
-| `listen_port` | VPS 上监听给客户端连接的端口 | `51043` |
+| `listen_port` | VPS 上监听给客户端连接的端口，可留空自动分配 | `51043` |
 | `type` | 家宽代理类型 | `socks5` 或 `http` |
 | `server` | 家宽代理服务器地址 | `proxy1.example.com` |
 | `server_port` | 家宽代理端口 | `1080` |
@@ -541,13 +541,13 @@ home-02,51044,http,proxy2.example.com,8080,user2,password2,tcp
 规则：
 
 1. `443` 不要写入 CSV。
-2. `listen_port` 不能重复。
-3. `listen_port` 必须在 `HOME_PORT_START` 和 `HOME_PORT_END` 范围内。
+2. `listen_port` 可留空自动分配；填写时不能重复。
+3. `listen_port` 必须在 `HOME_PORT_START` 和 `HOME_PORT_END` 范围内，默认从 `51043` 起分配。
 4. `type` 只支持 `socks5` 和 `http`。
 5. 密码里如果有英文逗号，必须用英文双引号包起来：
 
 ```csv
-home-01,51043,socks5,proxy.example.com,1080,user,"abc,123",tcp
+home-01,socks5,proxy.example.com,1080,user,"abc,123",tcp,
 ```
 
 6. CSV 里有家宽代理账号密码，不要公开、不要提交到 GitHub。
@@ -571,7 +571,6 @@ cat home-proxies.csv
 这是可选文件，用来把别人给你的节点分享链接接到本机新的 VLESS+Reality 入口端口。当前支持：
 
 ```text
-hysteria2://...
 vless://...security=none...
 vless://...security=reality...
 ```
@@ -583,23 +582,22 @@ cp upstream-nodes.example.txt upstream-nodes.txt
 nano upstream-nodes.txt
 ~~~
 
-推荐写成 CSV，端口由你明确指定：
+推荐写成 CSV，`listen_port` 可留空自动分配：
 
 ```csv
-tag,listen_port,node_url
-hy2-relay,51047,hysteria2://password@example.com:443?alpn=h3&insecure=1#hy2
-vless-relay,51048,vless://uuid@example.com:443?encryption=none&security=reality&flow=xtls-rprx-vision&type=tcp&sni=www.cloudflare.com&pbk=PUBLIC_KEY&fp=chrome#vless
-vless-plain,51049,vless://uuid@example.com:12345?type=tcp&encryption=none&security=none#vless-plain
+tag,node_url,listen_port
+vless-relay,vless://uuid@example.com:443?encryption=none&security=reality&flow=xtls-rprx-vision&type=tcp&sni=www.cloudflare.com&pbk=PUBLIC_KEY&fp=chrome&sid=abcd&spx=%2F#vless,
+vless-plain,vless://uuid@example.com:12345?type=tcp&encryption=none&security=none#vless-plain,51049
 ```
 
-也可以不写表头，只逐行放节点链接；脚本会自动分配 tag 和 `HOME_PORT_START` 到 `HOME_PORT_END` 范围内的空闲端口。
+也可以不写表头，只逐行放 `vless://` 节点链接；脚本会自动分配 tag 和 `HOME_PORT_START` 到 `HOME_PORT_END` 范围内的空闲端口。
 
 规则：
 
-1. `listen_port` 不能与 `DIRECT_PORT`、`home-proxies.csv` 或其他上游节点重复。
+1. `listen_port` 可留空自动分配；填写时不能与 `DIRECT_PORT`、`home-proxies.csv` 或其他上游节点重复。
 2. `listen_port` 必须在 `HOME_PORT_START` 和 `HOME_PORT_END` 范围内。
 3. 上游节点链接里包含密码、UUID、Reality public key 等连接信息，不要公开、不要提交到 GitHub。
-4. 这不是简单 TCP 转发；客户端连你的 VPS，VPS 再用 Hysteria2、普通 VLESS TCP 或 VLESS Reality 连接上游节点。
+4. 这不是简单 TCP 转发；客户端连你的 VPS，VPS 再用普通 VLESS TCP 或 VLESS Reality 连接上游节点。
 
 ---
 
@@ -789,7 +787,7 @@ DIRECT_PORT
 home-proxies.csv 里的每个 listen_port
 ```
 
-不会默认开放整个 `51043-51060` 范围。
+不会默认开放从 `51043` 起的整段端口范围。
 
 执行后查看：
 
@@ -849,7 +847,8 @@ sudo cat /root/reality-relay-bootstrap-clash.yaml
 ```bash
 ENABLE_SUBSCRIPTION_SERVER="true"
 SUBSCRIPTION_PORT="51040"
-SUBSCRIPTION_TARGET="VLESS_REALITY"
+SUBSCRIPTION_TARGET="ClashMeta"
+SUBSCRIPTION_BASE_URL=""
 ```
 
 更新订阅服务：
@@ -862,12 +861,12 @@ sudo bash bootstrap.sh --phase firewall
 订阅地址：
 
 ```text
-http://服务器IP:51040/sub/<VLESS_UUID>?target=VLESS_REALITY
+http://服务器IP:51040/sub/<VLESS_UUID>?target=ClashMeta
 ```
 
-`<VLESS_UUID>` 来自 `/etc/reality-relay-bootstrap/vless-uuid.txt`。内置订阅服务是 HTTP；如需 HTTPS，请在外层接入带证书的反向代理。仍建议只在服务商安全组里放行你的常用来源 IP。
+`<VLESS_UUID>` 来自 `/etc/reality-relay-bootstrap/vless-uuid.txt`。内置订阅服务是 HTTP；如需 HTTPS，请在外层接入带证书的反向代理，并把 `SUBSCRIPTION_BASE_URL` 设置为反代外部地址。仍建议只在服务商安全组里放行你的常用来源 IP。
 
-`SUBSCRIPTION_TARGET` 支持 `VLESS_REALITY`、`ClashMeta`、`V2Ray`、`QX`、`ShadowRocket`；默认生成标准 VLESS Reality URI 订阅。
+`SUBSCRIPTION_TARGET` 当前只生成 ClashMeta/Mihomo YAML；旧配置里的其它 target 会警告并按 ClashMeta 处理，旧 URL target 不再兼容。
 
 如果同时配置了 IPv4 和 IPv6，两个订阅链接都返回同一份完整节点；IPv4 节点名称保持不变，IPv6 节点名称追加 `-IPv6`。
 如果 Clash Verge 或浏览器无法导入 IPv6 字面量订阅地址，有 IPv4 时直接用 IPv4 订阅地址即可，它会返回同一份完整节点。

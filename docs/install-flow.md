@@ -11,9 +11,9 @@ cp upstream-nodes.example.txt upstream-nodes.txt
 nano upstream-nodes.txt
 ```
 
-`443` 不写入 CSV。CSV 只管理 `51043` 起的家宽出口端口。字段顺序为 `tag,listen_port,type,server,server_port,username,password,network`；分步骤模式直接编辑 `home-proxies.csv`，一键模式可选择逐个填写或一次性粘贴多行 CSV（可带表头，空行结束）。
+`443` 不写入 CSV。CSV 只管理 `51043` 起的出口端口。推荐字段顺序为 `tag,type,server,server_port,username,password,network,listen_port`；`listen_port` 可留空自动分配，旧字段顺序仍兼容。
 
-`upstream-nodes.txt` 是可选文件，用来接入上游节点分享链接。支持 `hysteria2://`、`vless://...security=none...` 和 `vless://...security=reality...`。可写 `tag,listen_port,node_url`，也可逐行只写节点链接让脚本自动分配端口。
+`upstream-nodes.txt` 是可选文件，用来接入上游节点分享链接。当前只支持 `vless://...security=none...` 和 `vless://...security=reality...`。推荐写 `tag,node_url,listen_port`，也可逐行只写节点链接让脚本自动分配端口；旧 `tag,listen_port,node_url` 仍兼容。
 
 ## 2. SSH 初始化与加固
 
@@ -78,4 +78,4 @@ UFW 只放行 SSH、`DIRECT_PORT`、`home-proxies.csv` 和 `upstream-nodes.txt` 
 sudo bash bootstrap.sh --phase validate
 ```
 
-`validate` 会测试家宽 HTTP/SOCKS 出口；对 `upstream-nodes.txt` 里的上游节点，会临时启动本地 socks 入口再通过对应 hy2/vless 上游访问 `https://ifconfig.me`。
+`validate` 会测试家宽 HTTP/SOCKS 出口；对 `upstream-nodes.txt` 里的上游节点，会临时启动本地 socks 入口再通过对应 vless 上游访问 `https://ifconfig.me`。连通性失败只告警，不阻断部署。

@@ -42,13 +42,17 @@ bantime = 1h
 EOF
 
 if ! is_dry_run; then
-  fail2ban-client -t 2>&1 | tee -a "$LOG_FILE"
+  fail2ban-client -t >>"$LOG_FILE" 2>&1
   systemctl enable fail2ban >>"$LOG_FILE" 2>&1
   systemctl restart fail2ban >>"$LOG_FILE" 2>&1
   sleep 1
   systemctl is-active --quiet fail2ban || die "fail2ban 未运行；完整日志见 $LOG_FILE"
   info "fail2ban 服务已启动。"
-  fail2ban-client status sshd 2>&1 | tee -a "$LOG_FILE" || true
+  if [[ "$RRB_VERBOSE" == "true" ]]; then
+    fail2ban-client status sshd 2>&1 | tee -a "$LOG_FILE" || true
+  else
+    fail2ban-client status sshd >>"$LOG_FILE" 2>&1 || true
+  fi
 else
   log "DRY-RUN: fail2ban-client -t && systemctl restart fail2ban"
 fi

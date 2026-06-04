@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import base64
 import importlib.util
 import json
 import os
@@ -11,16 +10,9 @@ import re
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
-from urllib.parse import quote, urlencode
 
 
-SUBSCRIPTION_TARGETS = {
-    "VLESS_REALITY",
-    "ClashMeta",
-    "V2Ray",
-    "QX",
-    "ShadowRocket",
-}
+SUBSCRIPTION_TARGETS = {"ClashMeta"}
 
 
 def load_generator(path: Path):
@@ -40,22 +32,22 @@ def yaml_bool(value: bool) -> str:
 
 
 def normalize_subscription_target(value: str) -> str:
-    compact = re.sub(r"[\s_-]+", "", (value or "VLESS_REALITY").lower())
+    compact = re.sub(r"[\s_-]+", "", (value or "ClashMeta").lower())
     aliases = {
-        "vless": "VLESS_REALITY",
-        "vlessreality": "VLESS_REALITY",
-        "reality": "VLESS_REALITY",
         "mihomo": "ClashMeta",
         "clash": "ClashMeta",
         "clashmeta": "ClashMeta",
-        "v2ray": "V2Ray",
-        "v2rayn": "V2Ray",
-        "v2rayng": "V2Ray",
-        "qx": "QX",
-        "quanx": "QX",
-        "quantumult": "QX",
-        "quantumultx": "QX",
-        "shadowrocket": "ShadowRocket",
+        "vless": "ClashMeta",
+        "vlessreality": "ClashMeta",
+        "reality": "ClashMeta",
+        "v2ray": "ClashMeta",
+        "v2rayn": "ClashMeta",
+        "v2rayng": "ClashMeta",
+        "qx": "ClashMeta",
+        "quanx": "ClashMeta",
+        "quantumult": "ClashMeta",
+        "quantumultx": "ClashMeta",
+        "shadowrocket": "ClashMeta",
     }
     target = aliases.get(compact, compact)
     if target not in SUBSCRIPTION_TARGETS:
@@ -211,63 +203,11 @@ def build_clash_yaml(env: Dict[str, str], nodes: List[Dict[str, Any]], clash_ipv
     return "\n".join(lines)
 
 
-def uri_host(host: str) -> str:
-    if ":" in host and not host.startswith("["):
-        return f"[{host}]"
-    return host
-
-
-def node_to_vless_uri(node: Dict[str, Any]) -> str:
-    params = {
-        "encryption": "none",
-        "security": "reality",
-        "sni": node["servername"],
-        "fp": node["client-fingerprint"],
-        "pbk": node["reality-opts"]["public-key"],
-        "sid": node["reality-opts"]["short-id"],
-        "type": "tcp",
-    }
-    if node.get("flow"):
-        params["flow"] = node["flow"]
-    if node.get("alpn"):
-        params["alpn"] = ",".join(node["alpn"])
-    query = urlencode(params)
-    return f"vless://{node['uuid']}@{uri_host(node['server'])}:{node['port']}?{query}#{quote(node['name'])}"
-
-
-def node_to_vless_reality_uri(node: Dict[str, Any]) -> str:
-    params = {
-        "type": "tcp",
-        "security": "reality",
-        "flow": node.get("flow", ""),
-        "fp": node["client-fingerprint"],
-        "sni": node["servername"],
-        "pbk": node["reality-opts"]["public-key"],
-        "sid": node["reality-opts"]["short-id"],
-        "spx": "/",
-    }
-    if not params["flow"]:
-        params.pop("flow")
-    query = urlencode(params)
-    return f"vless://{node['uuid']}@{uri_host(node['server'])}:{node['port']}?{query}#{quote(node['name'])}"
-
-
-def build_uri_subscription(nodes: List[Dict[str, Any]], *, base64_encode: bool) -> str:
-    text = "\n".join(node_to_vless_uri(node) for node in nodes) + "\n"
-    if not base64_encode:
-        return text
-    return base64.b64encode(text.encode("utf-8")).decode("ascii") + "\n"
-
-
 def build_subscription_payload(target: str, clash_yaml: str, nodes: List[Dict[str, Any]]) -> str:
     target = normalize_subscription_target(target)
-    if target == "VLESS_REALITY":
-        return "\n".join(node_to_vless_reality_uri(node) for node in nodes) + "\n"
     if target == "ClashMeta":
         return clash_yaml
-    if target == "V2Ray":
-        return build_uri_subscription(nodes, base64_encode=True)
-    return build_uri_subscription(nodes, base64_encode=False)
+    raise SystemExit(f"SUBSCRIPTION_TARGET 不支持：{target}")
 
 
 def mask(value: str) -> str:
@@ -317,7 +257,7 @@ def main() -> int:
             os.chmod(path, 0o600)
 
     if args.subscription_out:
-        target = normalize_subscription_target(args.subscription_target or env.get("SUBSCRIPTION_TARGET", "VLESS_REALITY"))
+        target = normalize_subscription_target(args.subscription_target or env.get("SUBSCRIPTION_TARGET", "ClashMeta"))
         subscription_payload = build_subscription_payload(target, clash_yaml, nodes)
         path = Path(args.subscription_out)
         path.parent.mkdir(parents=True, exist_ok=True)

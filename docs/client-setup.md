@@ -5,16 +5,17 @@
 ```bash
 ENABLE_SUBSCRIPTION_SERVER="true"
 SUBSCRIPTION_PORT="51040"
-SUBSCRIPTION_TARGET="VLESS_REALITY"
+SUBSCRIPTION_TARGET="ClashMeta"
+SUBSCRIPTION_BASE_URL=""
 ```
 
 订阅地址：
 
 ```text
-http://服务器IP:51040/sub/<VLESS_UUID>?target=VLESS_REALITY
+http://服务器IP:51040/sub/<VLESS_UUID>?target=ClashMeta
 ```
 
-`<VLESS_UUID>` 来自 `/etc/reality-relay-bootstrap/vless-uuid.txt`。内置订阅服务是 HTTP；如需 HTTPS，请在外层接入带证书的反向代理。
+`<VLESS_UUID>` 来自 `/etc/reality-relay-bootstrap/vless-uuid.txt`。内置订阅服务是 HTTP；如需 HTTPS，请在外层接入带证书的反向代理，并把 `SUBSCRIPTION_BASE_URL` 设置为反代外部地址。
 
 如需在服务器本地额外生成节点文件：
 
@@ -29,7 +30,7 @@ sudo bash bootstrap.sh --phase output-nodes
 如果同时配置了 IPv4 和 IPv6，两个订阅链接都返回同一份完整节点；IPv4 节点名称保持不变，IPv6 节点名称追加 `-IPv6`。
 如果 Clash Verge 或浏览器无法导入 IPv6 字面量订阅地址，有 IPv4 时直接用 IPv4 订阅地址即可，它会返回同一份完整节点。
 
-`SUBSCRIPTION_TARGET` 支持 `VLESS_REALITY`、`ClashMeta`、`V2Ray`、`QX`、`ShadowRocket`。`VLESS_REALITY` 会输出标准 VLESS Reality URI 订阅。
+`SUBSCRIPTION_TARGET` 当前只生成 ClashMeta/Mihomo YAML；旧配置里的其它 target 会警告并按 ClashMeta 处理，旧 URL target 不再兼容。
 
 如果 `PROXY_IP_VERSION="ipv6"` 或 `PROXY_IP_VERSION="dual"`，生成的 Clash/Mihomo 配置会启用 `ipv6: true`；默认 `ipv4` 会保持 `ipv6: false`。
 

@@ -1,5 +1,5 @@
-tag,listen_port,type,server,server_port,username,password,network
-# home-01,51043,socks5,proxy1.example.com,1080,user1,"pass,with,comma",tcp
-# home-02,51044,http,proxy2.example.com,8080,user2,password2,tcp
+tag,type,server,server_port,username,password,network,listen_port
+# home-01,socks5,proxy1.example.com,1080,user1,"pass,with,comma",tcp,
+# home-02,http,proxy2.example.com,8080,user2,password2,tcp,51044
 
 # 一键安装选择“多行 CSV”时，可以粘贴同样格式的多行内容；粘贴完成后输入空行结束。

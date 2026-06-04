@@ -91,7 +91,11 @@ install_by_233boy() {
   mkdir -p /root/reality-relay-bootstrap-cache
   curl -fsSL https://github.com/233boy/sing-box/raw/main/install.sh -o /root/reality-relay-bootstrap-cache/233boy-install.sh
   chmod 700 /root/reality-relay-bootstrap-cache/233boy-install.sh
-  bash /root/reality-relay-bootstrap-cache/233boy-install.sh
+  if [[ "$RRB_VERBOSE" == "true" ]]; then
+    bash /root/reality-relay-bootstrap-cache/233boy-install.sh 2>&1 | tee -a "$LOG_FILE"
+  else
+    bash /root/reality-relay-bootstrap-cache/233boy-install.sh >>"$LOG_FILE" 2>&1
+  fi
   local stamp
   stamp="$(date '+%Y%m%d-%H%M%S')"
   if [[ -d /etc/sing-box/conf ]]; then

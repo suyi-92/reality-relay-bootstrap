@@ -92,13 +92,7 @@ AI_IP_CIDRS = [
     "64.23.132.171/32",
 ]
 
-SUBSCRIPTION_TARGETS = {
-    "VLESS_REALITY",
-    "ClashMeta",
-    "V2Ray",
-    "QX",
-    "ShadowRocket",
-}
+SUBSCRIPTION_TARGETS = {"ClashMeta"}
 
 
 class ConfigError(SystemExit):
@@ -159,7 +153,7 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
         "MODE_443": "direct",
         "DIRECT_PORT": "443",
         "HOME_PORT_START": "51043",
-        "HOME_PORT_END": "51060",
+        "HOME_PORT_END": "65535",
         "ENABLE_UFW": "true",
         "ENABLE_FAIL2BAN": "true",
         "ENABLE_IPV6_LISTEN": "false",
@@ -186,7 +180,8 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
         "SUBSCRIPTION_PORT": "51040",
         "SUBSCRIPTION_DIR": f"{state_dir}/subscription",
         "RESET_PROXY_KEYS": "false",
-        "SUBSCRIPTION_TARGET": "VLESS_REALITY",
+        "SUBSCRIPTION_TARGET": "ClashMeta",
+        "SUBSCRIPTION_BASE_URL": "",
     }
     for k, v in d.items():
         merged.setdefault(k, v)
@@ -197,7 +192,7 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
         merged["SERVER_IP_IPV4"] = server_ip
     if not merged.get("SERVER_IP"):
         merged["SERVER_IP"] = merged.get("SERVER_IP_IPV4") or merged.get("SERVER_IP_IPV6") or ""
-    merged["SUBSCRIPTION_TARGET"] = normalize_subscription_target(merged.get("SUBSCRIPTION_TARGET", "VLESS_REALITY"))
+    merged["SUBSCRIPTION_TARGET"] = normalize_subscription_target(merged.get("SUBSCRIPTION_TARGET", "ClashMeta"))
 
     default_state_dir = "/etc/reality-relay-bootstrap"
     if merged["RRB_STATE_DIR"] != default_state_dir:
@@ -214,26 +209,28 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
 
 
 def normalize_subscription_target(value: str) -> str:
-    compact = re.sub(r"[\s_-]+", "", (value or "VLESS_REALITY").lower())
+    compact = re.sub(r"[\s_-]+", "", (value or "ClashMeta").lower())
     aliases = {
-        "vless": "VLESS_REALITY",
-        "vlessreality": "VLESS_REALITY",
-        "reality": "VLESS_REALITY",
         "mihomo": "ClashMeta",
         "clash": "ClashMeta",
         "clashmeta": "ClashMeta",
-        "v2ray": "V2Ray",
-        "v2rayn": "V2Ray",
-        "v2rayng": "V2Ray",
-        "qx": "QX",
-        "quanx": "QX",
-        "quantumult": "QX",
-        "quantumultx": "QX",
-        "shadowrocket": "ShadowRocket",
+        "vless": "ClashMeta",
+        "vlessreality": "ClashMeta",
+        "reality": "ClashMeta",
+        "v2ray": "ClashMeta",
+        "v2rayn": "ClashMeta",
+        "v2rayng": "ClashMeta",
+        "qx": "ClashMeta",
+        "quanx": "ClashMeta",
+        "quantumult": "ClashMeta",
+        "quantumultx": "ClashMeta",
+        "shadowrocket": "ClashMeta",
     }
     target = aliases.get(compact, compact)
     if target not in SUBSCRIPTION_TARGETS:
         raise ConfigError(f"SUBSCRIPTION_TARGET 不支持：{value}")
+    if compact not in {"", "mihomo", "clash", "clashmeta"}:
+        print(f"WARN: SUBSCRIPTION_TARGET={value} 已废弃；当前只生成 ClashMeta/Mihomo 订阅。", file=sys.stderr)
     return target
 
 
@@ -298,7 +295,7 @@ def validate_env(env: Dict[str, str]) -> None:
         "RESET_PROXY_KEYS",
     ]:
         as_bool(env, key)
-    normalize_subscription_target(env.get("SUBSCRIPTION_TARGET", "VLESS_REALITY"))
+    normalize_subscription_target(env.get("SUBSCRIPTION_TARGET", "ClashMeta"))
     if direct_port != 443:
         print(f"WARN: DIRECT_PORT={direct_port}，不是默认 443。", file=sys.stderr)
     if as_bool(env, "ENABLE_IPV6_LISTEN"):
@@ -396,52 +393,6 @@ def userinfo_password(split: Any) -> str:
     return unquote(split.netloc.rsplit("@", 1)[0])
 
 
-def parse_hysteria2_upstream(tag: str, listen_port: int, node_url: str, lineno: int) -> Dict[str, Any]:
-    split, host, port, params = split_host_port(node_url, "hysteria2", lineno)
-    password = userinfo_password(split) or first_query_value(params, "password", "auth")
-    if not password:
-        raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行 hysteria2 节点缺少密码。")
-
-    tls: Dict[str, Any] = {"enabled": True}
-    server_name = first_query_value(params, "sni", "peer", "server_name", "servername")
-    if server_name:
-        tls["server_name"] = server_name
-    alpn = split_csv_items(first_query_value(params, "alpn"))
-    if alpn:
-        tls["alpn"] = alpn
-    if query_bool(params, "insecure", "allowInsecure"):
-        tls["insecure"] = True
-
-    outbound: Dict[str, Any] = {
-        "type": "hysteria2",
-        "tag": f"out-{tag}",
-        "server": host,
-        "server_port": port,
-        "password": password,
-        "tls": tls,
-        "domain_resolver": "dns-cloudflare",
-    }
-    network = first_query_value(params, "network")
-    if network:
-        if network not in {"tcp", "udp"}:
-            raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行 hysteria2 network 只支持 tcp 或 udp。")
-        outbound["network"] = network
-    obfs = first_query_value(params, "obfs", "obfs_type")
-    obfs_password = first_query_value(params, "obfs-password", "obfs_password")
-    if obfs and obfs_password:
-        outbound["obfs"] = {"type": obfs, "password": obfs_password}
-
-    return {
-        "tag": tag,
-        "listen_port": listen_port,
-        "type": "hysteria2",
-        "server": host,
-        "server_port": port,
-        "source": "upstream",
-        "outbound": outbound,
-    }
-
-
 def parse_vless_upstream(tag: str, listen_port: int, node_url: str, lineno: int) -> Dict[str, Any]:
     split, host, port, params = split_host_port(node_url, "vless", lineno)
     uuid = userinfo_password(split)
@@ -510,12 +461,9 @@ def parse_vless_upstream(tag: str, listen_port: int, node_url: str, lineno: int)
 
 def parse_upstream_node(tag: str, listen_port: int, node_url: str, lineno: int) -> Dict[str, Any]:
     scheme = urlsplit(node_url.strip().replace("&amp;", "&")).scheme.lower()
-    if scheme in {"hysteria2", "hy2"}:
-        url = "hysteria2://" + node_url.split("://", 1)[1] if scheme == "hy2" else node_url
-        return parse_hysteria2_upstream(tag, listen_port, url, lineno)
     if scheme == "vless":
         return parse_vless_upstream(tag, listen_port, node_url, lineno)
-    raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行暂不支持协议：{scheme or '空'}；当前支持 hysteria2、vless security=none 和 vless reality。")
+    raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行暂不支持协议：{scheme or '空'}；当前只支持 vless:// 上游。")
 
 
 def load_home_rows(
@@ -562,10 +510,10 @@ def load_home_rows(
         network = (normalized.get("network") or "tcp").lower()
 
         try:
-            listen_port = int(normalized["listen_port"])
+            listen_port = int(normalized["listen_port"]) if normalized["listen_port"] else next_available_port(start, end, used_ports)
             server_port = int(normalized["server_port"])
         except ValueError as exc:
-            raise ConfigError(f"第 {lineno} 行 listen_port/server_port 必须是数字") from exc
+            raise ConfigError(f"第 {lineno} 行 listen_port/server_port 必须是数字；listen_port 可留空自动分配") from exc
 
         if not (1 <= server_port <= 65535):
             raise ConfigError(f"第 {lineno} 行 server_port 超出范围 1-65535：{server_port}")
@@ -633,20 +581,23 @@ def load_upstream_rows(env: Dict[str, str], base: Path, used_tags: set[str], use
     rows: List[Dict[str, Any]] = []
     first = lines[0].strip()
 
-    if first.lower().replace(" ", "").startswith("tag,listen_port,node_url"):
+    first_fields = [item.strip().lower() for item in next(csv.reader([first]))]
+    if REQUIRED_UPSTREAM_COLUMNS <= set(first_fields):
         reader = csv.DictReader(lines)
         missing = REQUIRED_UPSTREAM_COLUMNS - set(reader.fieldnames or [])
         if missing:
             raise ConfigError("upstream-nodes.txt 表头缺少字段：" + ", ".join(sorted(missing)))
         iterable = []
+        local_seen_ports: set[int] = set()
         for lineno, row in enumerate(reader, start=2):
             normalized = {k: (v or "").strip() for k, v in row.items()}
             if not any(normalized.values()):
                 continue
             try:
-                listen_port = int(normalized["listen_port"])
+                listen_port = int(normalized["listen_port"]) if normalized["listen_port"] else next_available_port(start, end, used_ports | local_seen_ports)
             except ValueError as exc:
-                raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行 listen_port 必须是数字") from exc
+                raise ConfigError(f"upstream-nodes.txt 第 {lineno} 行 listen_port 必须是数字；也可以留空自动分配") from exc
+            local_seen_ports.add(listen_port)
             iterable.append((lineno, normalized["tag"], listen_port, normalized["node_url"]))
     else:
         iterable = []

@@ -13,11 +13,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 
 
 TARGET_FILES: Dict[str, Tuple[str, str]] = {
-    "VLESS_REALITY": ("vless-reality.txt", "text/plain; charset=utf-8"),
     "ClashMeta": ("clashmeta.yaml", "text/yaml; charset=utf-8"),
-    "V2Ray": ("v2ray.txt", "text/plain; charset=utf-8"),
-    "QX": ("qx.txt", "text/plain; charset=utf-8"),
-    "ShadowRocket": ("shadowrocket.txt", "text/plain; charset=utf-8"),
 }
 
 
@@ -35,22 +31,11 @@ class IPv6HTTPServer(ReusableHTTPServer):
 
 
 def normalize_target(value: str) -> str:
-    compact = re.sub(r"[\s_-]+", "", (value or "VLESS_REALITY").lower())
+    compact = re.sub(r"[\s_-]+", "", (value or "ClashMeta").lower())
     aliases = {
-        "vless": "VLESS_REALITY",
-        "vlessreality": "VLESS_REALITY",
-        "reality": "VLESS_REALITY",
         "mihomo": "ClashMeta",
         "clash": "ClashMeta",
         "clashmeta": "ClashMeta",
-        "v2ray": "V2Ray",
-        "v2rayn": "V2Ray",
-        "v2rayng": "V2Ray",
-        "qx": "QX",
-        "quanx": "QX",
-        "quantumult": "QX",
-        "quantumultx": "QX",
-        "shadowrocket": "ShadowRocket",
     }
     return aliases.get(compact, compact)
 
@@ -89,7 +74,7 @@ def build_handler(root: Path, token_file: Path, default_target: str):
         def do_GET(self) -> None:
             split = urlsplit(self.path)
             if split.path == "/":
-                self.send_body(200, b"subscription path: /sub/<token>?target=VLESS_REALITY\n", "text/plain; charset=utf-8")
+                self.send_body(200, b"subscription path: /sub/<token>?target=ClashMeta\n", "text/plain; charset=utf-8")
                 return
             if not split.path.startswith("/sub/"):
                 self.send_body(404, b"not found\n", "text/plain; charset=utf-8")
@@ -148,7 +133,7 @@ def main() -> int:
     parser.add_argument("--ipv4", choices=["true", "false"], default="true")
     parser.add_argument("--ipv6", choices=["true", "false"], default="false")
     parser.add_argument("--token-file", type=Path, required=True)
-    parser.add_argument("--default-target", default="VLESS_REALITY")
+    parser.add_argument("--default-target", default="ClashMeta")
     args = parser.parse_args()
 
     default_target = normalize_target(args.default_target)
