@@ -19,8 +19,8 @@ Usage: sudo bash bootstrap.sh --phase <phase> [--config config.env] [--dry-run] 
 
 Phases:
   preflight       检测系统、配置和 SSH 基础条件
-  ssh-phase1      创建 admin/SFTP 用户，只开启公钥登录，不禁 root/密码
-  ssh-final       二阶段 SSH 最终加固；必须 CONFIRM_ADMIN_KEY_LOGIN=yes
+  ssh-phase1      准备 root/SFTP 公钥登录，不禁 root/密码
+  ssh-final       二阶段 SSH 最终加固；必须 CONFIRM_ROOT_KEY_LOGIN=yes
   fail2ban        安装并配置 fail2ban
   singbox         安装 sing-box、生成 VLESS+Reality 多入口配置并重启
   subscription    安装/更新可选订阅端口
@@ -54,7 +54,7 @@ run_phase() {
 case "$PHASE" in
   preflight) run_phase 01-preflight.sh ;;
   ssh-phase1)
-    run_phase 02-create-admin.sh
+    run_phase 02-setup-root-ssh.sh
     run_phase 03-ssh-hardening-phase1.sh
     ;;
   ssh-final) run_phase 04-ssh-hardening-final.sh ;;

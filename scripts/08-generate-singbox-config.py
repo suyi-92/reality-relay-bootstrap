@@ -141,7 +141,7 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
         "SERVER_IP_IPV6": "",
         "SSH_PORT": "22",
         "INITIAL_USER": "root",
-        "ADMIN_USER": "admin",
+        "ADMIN_USER": "root",
         "ADMIN_PUBKEY": "",
         "ADMIN_PUBKEYS": "",
         "ENABLE_SFTP_USER": "false",
@@ -192,6 +192,9 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
         merged["SERVER_IP_IPV4"] = server_ip
     if not merged.get("SERVER_IP"):
         merged["SERVER_IP"] = merged.get("SERVER_IP_IPV4") or merged.get("SERVER_IP_IPV6") or ""
+    if merged.get("ADMIN_USER", "root") != "root":
+        print(f"WARN: ADMIN_USER={merged.get('ADMIN_USER')} 已废弃；当前统一使用 root。", file=sys.stderr)
+        merged["ADMIN_USER"] = "root"
     merged["SUBSCRIPTION_TARGET"] = normalize_subscription_target(merged.get("SUBSCRIPTION_TARGET", "ClashMeta"))
 
     default_state_dir = "/etc/reality-relay-bootstrap"

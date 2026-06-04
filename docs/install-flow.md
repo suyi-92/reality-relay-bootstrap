@@ -25,13 +25,13 @@ sudo bash bootstrap.sh --phase ssh-phase1
 保留当前 SSH 窗口，另开窗口测试：
 
 ```powershell
-ssh -p 22 -o PreferredAuthentications=publickey -o PasswordAuthentication=no admin@服务器IP
+ssh -p 22 -o PreferredAuthentications=publickey -o PasswordAuthentication=no root@服务器IP
 ```
 
-确认 `whoami` 为 `admin` 且 `sudo whoami` 为 `root` 后：
+确认 `whoami` 为 `root` 后：
 
 ```bash
-sudo CONFIRM_ADMIN_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final
+sudo CONFIRM_ROOT_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final
 ```
 
 ## 3. fail2ban

@@ -10,6 +10,13 @@ backup_path /etc/ssh/sshd_config
 [[ -d /etc/ssh/sshd_config.d ]] && backup_path /etc/ssh/sshd_config.d
 ensure_sshd_dropin_include
 
+if [[ -f /etc/ssh/sshd_config.d/00-reality-relay-bootstrap-hardening.conf ]]; then
+  if is_dry_run; then
+    log "DRY-RUN: remove old final hardening drop-in before phase1"
+  else
+    rm -f /etc/ssh/sshd_config.d/00-reality-relay-bootstrap-hardening.conf
+  fi
+fi
 
 write_root_file /etc/ssh/sshd_config.d/00-reality-relay-bootstrap-phase1.conf 0644 <<'EOF'
 # Managed by reality-relay-bootstrap phase1.
@@ -25,7 +32,7 @@ cat <<EOF
 
 SSH phase1 已完成；当前仍未禁用 root/密码登录。
 
-请保留当前 SSH 窗口，另开一个新的 Windows PowerShell 测试 admin key 登录：
+请保留当前 SSH 窗口，另开一个新的 Windows PowerShell 测试 root key 登录：
 $(if [[ -n "$(server_ipv4_hosts)" ]]; then
   printf 'IPv4:\n'
   for host in $(server_ipv4_hosts); do
@@ -49,12 +56,10 @@ fi)
 
 登录成功后在新窗口执行：
   whoami
-  sudo whoami
 
 确认输出为：
-  $ADMIN_USER
   root
 
 确认后再执行最终加固：
-  sudo CONFIRM_ADMIN_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final
+  sudo CONFIRM_ROOT_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final
 EOF

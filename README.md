@@ -6,7 +6,7 @@
 
 ## 设计原则
 
-1. **不锁机优先**：SSH 拆成 phase1 和 final。phase1 只创建用户并开启公钥登录，不禁 root、不禁密码。只有另开窗口确认 admin key 登录成功后，才能用 `CONFIRM_ADMIN_KEY_LOGIN=yes` 执行 final。
+1. **不锁机优先**：SSH 拆成 phase1 和 final。phase1 只准备 root 公钥登录，不禁 root、不禁密码。只有另开窗口确认 root key 登录成功后，才能用 `CONFIRM_ROOT_KEY_LOGIN=yes` 执行 final。
 2. **先备份后修改**：SSH、fail2ban、UFW、sing-box 配置都会备份到 `/root/reality-relay-bootstrap-backups/`。
 3. **先检查后重启**：`sshd -t` 通过后才 reload SSH；`sing-box check -c /etc/sing-box/config.json` 通过后才 restart sing-box。
 4. **默认最小开放端口**：UFW 只放行当前 SSH 端口、`DIRECT_PORT`、家宽 CSV 和上游节点里的实际 `listen_port`，不会开放从 51043 起的整段端口。
@@ -27,7 +27,7 @@ reality-relay-bootstrap/
   scripts/
     00-lib.sh
     01-preflight.sh
-    02-create-admin.sh
+    02-setup-root-ssh.sh
     03-ssh-hardening-phase1.sh
     04-ssh-hardening-final.sh
     05-install-fail2ban.sh
@@ -55,7 +55,7 @@ reality-relay-bootstrap/
 
 更详细的参数解释、Windows PowerShell 示例、回滚和客户端导入说明，请阅读 [`reality-relay-bootstrap-usage.md`](./reality-relay-bootstrap-usage.md)。
 
-如果是在全新 VPS 上使用推荐默认值部署，可以直接运行一键安装脚本。脚本会自动拉取/定位项目、生成 `config.env`、`home-proxies.csv` 和 `upstream-nodes.txt`，会提示填写服务器 IPv4/IPv6、SSH、入口端口、节点订阅配置、管理员公钥、家宽代理 CSV 以及可选上游节点：
+如果是在全新 VPS 上使用推荐默认值部署，可以直接运行一键安装脚本。脚本会自动拉取/定位项目、生成 `config.env`、`home-proxies.csv` 和 `upstream-nodes.txt`，会提示填写服务器 IPv4/IPv6、SSH、入口端口、节点订阅配置、root 公钥、家宽代理 CSV 以及可选上游节点：
 
 ```bash
 bash <(wget -qO- https://raw.githubusercontent.com/suyi-92/reality-relay-bootstrap/main/install.sh)
@@ -67,7 +67,7 @@ bash <(wget -qO- https://raw.githubusercontent.com/suyi-92/reality-relay-bootstr
 sudo bash install.sh
 ```
 
-一键脚本仍然保留 SSH 二阶段安全确认：完成 `ssh-phase1` 后，需要你另开窗口确认 admin 公钥登录和 `sudo` 正常，才会继续执行 `ssh-final`。家宽代理既可以按提示逐个填写，也可以选择一次性粘贴多行 CSV；上游节点可以直接逐行粘贴普通 `vless://` 或 VLESS Reality 分享链接，也可以粘贴 `tag,node_url,listen_port` CSV。
+一键脚本仍然保留 SSH 二阶段安全确认：完成 `ssh-phase1` 后，需要你另开窗口确认 root 公钥登录正常，才会继续执行 `ssh-final`。家宽代理既可以按提示逐个填写，也可以选择一次性粘贴多行 CSV；上游节点可以直接逐行粘贴普通 `vless://` 或 VLESS Reality 分享链接，也可以粘贴 `tag,node_url,listen_port` CSV。
 
 ## 第一次使用
 
@@ -107,7 +107,7 @@ SERVER_IP="你的服务器公网IP"
 SERVER_IP_IPV4="你的服务器公网IPv4"
 SERVER_IP_IPV6=""
 SSH_PORT="22"
-ADMIN_USER="admin"
+ADMIN_USER="root"
 ADMIN_PUBKEY="ssh-ed25519 AAAA... 你的本地公钥"
 # 多个公钥可写成逐行内容，例如：
 # ADMIN_PUBKEY=$'ssh-ed25519 AAAA... user1\nssh-ed25519 BBBB... user2'
@@ -115,7 +115,7 @@ ADMIN_PUBKEY="ssh-ed25519 AAAA... 你的本地公钥"
 MODE_443="direct"
 ```
 
-如果 root 已经有正确公钥，`ADMIN_PUBKEY` 可以留空，脚本会复制 `/root/.ssh/authorized_keys` 给 admin。分步骤运行时，`ADMIN_PUBKEY` 支持用 `$'key1\nkey2'` 写多个公钥，也可以把额外公钥逐行写入 `ADMIN_PUBKEYS`；一键脚本会逐条提示添加多个 `ADMIN_PUBKEY`。
+如果 root 已经有正确公钥，`ADMIN_PUBKEY` 可以留空，脚本会复用 `/root/.ssh/authorized_keys`。分步骤运行时，`ADMIN_PUBKEY` 支持用 `$'key1\nkey2'` 写多个公钥，也可以把额外公钥逐行写入 `ADMIN_PUBKEYS`；一键脚本会逐条提示添加多个 `ADMIN_PUBKEY`。
 
 ## VLESS+Reality 参数
 
@@ -206,8 +206,8 @@ vless-plain,vless://uuid@example.com:12345?type=tcp&encryption=none&security=non
 sudo bash bootstrap.sh --phase preflight
 sudo bash bootstrap.sh --phase ssh-phase1
 
-# 另开窗口测试 admin key 登录成功后：
-sudo CONFIRM_ADMIN_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final
+# 另开窗口测试 root key 登录成功后：
+sudo CONFIRM_ROOT_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final
 
 sudo bash bootstrap.sh --phase fail2ban
 sudo bash bootstrap.sh --phase singbox
@@ -217,25 +217,24 @@ sudo bash bootstrap.sh --phase validate
 
 ## SSH 二阶段说明
 
-`ssh-phase1` 会创建 admin、安装 SSH 公钥、可选创建 SFTP-only 用户、写入 phase1 drop-in，只开启公钥登录，不禁 root、不禁密码。
+`ssh-phase1` 会给 root 安装 SSH 公钥、可选创建 SFTP-only 用户、写入 phase1 drop-in，只开启公钥登录，不禁 root、不禁密码。
 
 不要关闭当前 SSH 窗口。另开 Windows PowerShell 测试：
 
 ```powershell
-ssh -p 22 -o PreferredAuthentications=publickey -o PasswordAuthentication=no admin@服务器IP
+ssh -p 22 -o PreferredAuthentications=publickey -o PasswordAuthentication=no root@服务器IP
 ```
 
 登录后执行：
 
 ```bash
 whoami
-sudo whoami
 ```
 
-只有确认输出为 `admin` 和 `root` 后，才执行：
+只有确认输出为 `root` 后，才执行：
 
 ```bash
-sudo CONFIRM_ADMIN_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final
+sudo CONFIRM_ROOT_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final
 ```
 
 ## 安装 sing-box 与生成配置
@@ -369,9 +368,8 @@ Windows PowerShell：
 ```powershell
 Test-NetConnection 服务器IP -Port 443
 Test-NetConnection 服务器IP -Port 51043
-ssh -p 22 -o PreferredAuthentications=publickey -o PasswordAuthentication=no admin@服务器IP
-ssh -p 22 root@服务器IP
-ssh -p 22 -o PubkeyAuthentication=no -o PreferredAuthentications=password admin@服务器IP
+ssh -p 22 -o PreferredAuthentications=publickey -o PasswordAuthentication=no root@服务器IP
+ssh -p 22 -o PubkeyAuthentication=no -o PreferredAuthentications=password root@服务器IP
 ```
 
 ## 回滚

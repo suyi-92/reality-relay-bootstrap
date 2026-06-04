@@ -6,7 +6,7 @@
 
 ```bash
 sudo /usr/sbin/sshd -t
-sudo /usr/sbin/sshd -T -C user=admin,host=localhost,addr=127.0.0.1
+sudo /usr/sbin/sshd -T -C user=root,host=localhost,addr=127.0.0.1
 ```
 
 如果新窗口无法登录，可在旧窗口回滚：

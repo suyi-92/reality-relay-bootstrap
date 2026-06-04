@@ -128,7 +128,11 @@ load_config() {
   export SERVER_IP SERVER_IP_IPV4 SERVER_IP_IPV6
   : "${SSH_PORT:=22}"
   : "${INITIAL_USER:=root}"
-  : "${ADMIN_USER:=admin}"
+  : "${ADMIN_USER:=root}"
+  if [[ "$ADMIN_USER" != "root" ]]; then
+    warn "ADMIN_USER=$ADMIN_USER 已废弃；当前统一使用 root，不再创建独立管理员用户。"
+    ADMIN_USER="root"
+  fi
   : "${ADMIN_PUBKEY:=}"
   : "${ADMIN_PUBKEYS:=}"
   if [[ -n "$ADMIN_PUBKEYS" ]]; then
@@ -139,7 +143,7 @@ load_config() {
       ADMIN_PUBKEY="$ADMIN_PUBKEYS"
     fi
   fi
-  export ADMIN_PUBKEY ADMIN_PUBKEYS
+  export ADMIN_USER ADMIN_PUBKEY ADMIN_PUBKEYS
   : "${ENABLE_SFTP_USER:=false}"
   : "${SFTP_USER:=sftpuser}"
   : "${SFTP_PUBKEY:=}"
@@ -154,7 +158,6 @@ load_config() {
   : "${ENABLE_UFW:=true}"
   : "${ENABLE_FAIL2BAN:=true}"
   : "${ENABLE_IPV6_LISTEN:=false}"
-  : "${ADMIN_SUDO_NOPASSWD:=true}"
   : "${CSV_PATH:=./home-proxies.csv}"
   : "${UPSTREAM_NODES_PATH:=./upstream-nodes.txt}"
   : "${RRB_STATE_DIR:=/etc/reality-relay-bootstrap}"
@@ -303,7 +306,6 @@ validate_config_basics() {
   validate_bool ENABLE_UFW
   validate_bool ENABLE_FAIL2BAN
   validate_bool ENABLE_IPV6_LISTEN
-  validate_bool ADMIN_SUDO_NOPASSWD
   validate_bool REJECT_CN_PRIVATE
   validate_bool CLIENT_UDP
   validate_bool ENABLE_SUBSCRIPTION_SERVER

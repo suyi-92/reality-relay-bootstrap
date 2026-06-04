@@ -146,7 +146,7 @@ collect_admin_pubkeys() {
 
   line
   printf '%b\n' "${CYAN}${BOLD}管理员 SSH 公钥${RESET}"
-  printf '%b\n' "${DIM}可以填写多个 ADMIN_PUBKEY；留空回车结束。${RESET}"
+  printf '%b\n' "${DIM}这些公钥会写入 root 的 authorized_keys；留空回车结束。${RESET}"
   while true; do
     key="$(read_default "ADMIN_PUBKEY #${index}" "")"
     if [[ -n "$key" ]]; then
@@ -252,7 +252,7 @@ ensure_project() {
 }
 
 write_config() {
-  local project_dir="$1" server_alias="$2" server_ip_ipv4="$3" server_ip_ipv6="$4" ssh_port="$5" admin_user="$6" admin_pubkey="$7" direct_port="$8" enable_subscription_server="$9" subscription_port="${10}" subscription_target="${11}" reset_proxy_keys="${12}" home_port_start="${13}" home_port_end="${14}"
+  local project_dir="$1" server_alias="$2" server_ip_ipv4="$3" server_ip_ipv6="$4" ssh_port="$5" admin_pubkey="$6" direct_port="$7" enable_subscription_server="$8" subscription_port="$9" subscription_target="${10}" reset_proxy_keys="${11}" home_port_start="${12}" home_port_end="${13}"
   local server_ip="$server_ip_ipv4"
   local proxy_ip_version="ipv4"
   local enable_ipv6_listen="false"
@@ -271,7 +271,7 @@ SERVER_IP_IPV4=$(shell_quote "$server_ip_ipv4")
 SERVER_IP_IPV6=$(shell_quote "$server_ip_ipv6")
 SSH_PORT=$(shell_quote "$ssh_port")
 INITIAL_USER="root"
-ADMIN_USER=$(shell_quote "$admin_user")
+ADMIN_USER="root"
 ADMIN_PUBKEY=$(shell_quote "$admin_pubkey")
 ADMIN_PUBKEYS=""
 ENABLE_SFTP_USER="false"
@@ -286,7 +286,6 @@ ENABLE_UFW="true"
 ENABLE_FAIL2BAN="true"
 ENABLE_IPV6_LISTEN=$(shell_quote "$enable_ipv6_listen")
 
-ADMIN_SUDO_NOPASSWD="true"
 SFTP_PUBKEY=""
 CSV_PATH="./home-proxies.csv"
 UPSTREAM_NODES_PATH="./upstream-nodes.txt"
@@ -474,7 +473,7 @@ collect_upstream_nodes() {
 }
 
 run_install_flow() {
-  local project_dir="$1" server_ip_ipv4="$2" server_ip_ipv6="$3" ssh_port="$4" admin_user="$5" enable_subscription_server="$6" subscription_port="$7" subscription_target="$8"
+  local project_dir="$1" server_ip_ipv4="$2" server_ip_ipv6="$3" ssh_port="$4" enable_subscription_server="$5" subscription_port="$6" subscription_target="$7"
   cd "$project_dir"
   line
   printf '%b\n' "${GREEN}${BOLD}配置文件已生成：${RESET}"
@@ -492,21 +491,21 @@ run_install_flow() {
 
   line
   printf '%b\n' "${YELLOW}${BOLD}安全确认：不要关闭当前 SSH 窗口。${RESET}"
-  printf '请另开一个终端，确认下面命令可以通过公钥登录并 sudo 成功：\n\n'
+  printf '请另开一个终端，确认下面命令可以通过 root 公钥登录：\n\n'
   if [[ -n "$server_ip_ipv4" ]]; then
     printf 'IPv4:\n'
-    printf '  ssh -p %q -o PreferredAuthentications=publickey -o PasswordAuthentication=no %q@%q\n' "$ssh_port" "$admin_user" "$server_ip_ipv4"
+    printf '  ssh -p %q -o PreferredAuthentications=publickey -o PasswordAuthentication=no root@%q\n' "$ssh_port" "$server_ip_ipv4"
   fi
   if [[ -n "$server_ip_ipv6" ]]; then
     printf '\nIPv6:\n'
-    printf '  ssh -p %q -o PreferredAuthentications=publickey -o PasswordAuthentication=no %q@%q\n' "$ssh_port" "$admin_user" "$server_ip_ipv6"
+    printf '  ssh -p %q -o PreferredAuthentications=publickey -o PasswordAuthentication=no root@%q\n' "$ssh_port" "$server_ip_ipv6"
   fi
-  printf '\n  whoami && sudo whoami\n\n'
-  printf '确认输出包含 %q 和 root 后，再回到这里继续。\n' "$admin_user"
-  if read_yes_no "我已确认 admin 公钥登录和 sudo 正常，继续 SSH final 加固？" no; then
-    CONFIRM_ADMIN_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final
+  printf '\n  whoami\n\n'
+  printf '确认输出为 root 后，再回到这里继续。\n'
+  if read_yes_no "我已确认 root 公钥登录正常，继续 SSH final 加固？" no; then
+    CONFIRM_ROOT_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final
   else
-    warn "已暂停在 ssh-phase1。之后可手动执行：sudo CONFIRM_ADMIN_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final"
+    warn "已暂停在 ssh-phase1。之后可手动执行：sudo CONFIRM_ROOT_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final"
     return 0
   fi
 
@@ -553,12 +552,11 @@ main() {
 
   line
   printf '%b\n' "${CYAN}${BOLD}基础信息${RESET}"
-  local server_alias server_ip_ipv4 server_ip_ipv6 ssh_port admin_user admin_pubkey direct_port enable_subscription_server subscription_port subscription_target reset_proxy_keys home_port_start home_port_end
+  local server_alias server_ip_ipv4 server_ip_ipv6 ssh_port admin_pubkey direct_port enable_subscription_server subscription_port subscription_target reset_proxy_keys home_port_start home_port_end
   server_alias="$(read_default "SERVER_ALIAS" "")"
   server_ip_ipv4="$(read_default "SERVER_IP_IPv4" "$default_ip")"
   server_ip_ipv6="$(read_default "SERVER_IP_IPv6" "")"
   ssh_port="$(read_default "SSH_PORT" "22")"
-  admin_user="$(read_default "ADMIN_USER" "admin")"
   direct_port="$(read_default "DIRECT_PORT" "443")"
 
   line
@@ -580,15 +578,15 @@ main() {
   ROWS_FILE="$(mktemp)"
   UPSTREAM_ROWS_FILE="$(mktemp)"
   trap 'rm -f "${ADMIN_KEYS_FILE:-}" "${ROWS_FILE:-}" "${UPSTREAM_ROWS_FILE:-}"' EXIT
-  ADMIN_USER="$admin_user" collect_admin_pubkeys "$ADMIN_KEYS_FILE"
+  ADMIN_USER="root" collect_admin_pubkeys "$ADMIN_KEYS_FILE"
   admin_pubkey="$(cat "$ADMIN_KEYS_FILE")"
   collect_home_proxies "$ROWS_FILE"
   collect_upstream_nodes "$UPSTREAM_ROWS_FILE" "$ROWS_FILE" "$home_port_start" "$home_port_end"
 
-  write_config "$project_dir" "$server_alias" "$server_ip_ipv4" "$server_ip_ipv6" "$ssh_port" "$admin_user" "$admin_pubkey" "$direct_port" "$enable_subscription_server" "$subscription_port" "$subscription_target" "$reset_proxy_keys" "$home_port_start" "$home_port_end"
+  write_config "$project_dir" "$server_alias" "$server_ip_ipv4" "$server_ip_ipv6" "$ssh_port" "$admin_pubkey" "$direct_port" "$enable_subscription_server" "$subscription_port" "$subscription_target" "$reset_proxy_keys" "$home_port_start" "$home_port_end"
   write_home_proxies "$project_dir" "$ROWS_FILE"
   write_upstream_nodes "$project_dir" "$UPSTREAM_ROWS_FILE"
-  run_install_flow "$project_dir" "$server_ip_ipv4" "$server_ip_ipv6" "$ssh_port" "$admin_user" "$enable_subscription_server" "$subscription_port" "$subscription_target"
+  run_install_flow "$project_dir" "$server_ip_ipv4" "$server_ip_ipv6" "$ssh_port" "$enable_subscription_server" "$subscription_port" "$subscription_target"
 }
 
 main "$@"

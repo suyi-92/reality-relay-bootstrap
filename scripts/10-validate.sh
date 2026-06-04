@@ -322,7 +322,6 @@ $(if [[ -n "$(server_ipv4_hosts)" ]]; then
     done
     printf '\n'
     printf '  ssh -p %s -o PreferredAuthentications=publickey -o PasswordAuthentication=no %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
-    printf '  ssh -p %s root@%s\n' "$SSH_PORT" "$host"
     printf '  ssh -p %s -o PubkeyAuthentication=no -o PreferredAuthentications=password %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
   done
   printf '\n'
@@ -335,7 +334,6 @@ $(if [[ -n "$(server_ipv6_hosts)" ]]; then
     done
     printf '\n'
     printf '  ssh -p %s -o PreferredAuthentications=publickey -o PasswordAuthentication=no %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
-    printf '  ssh -p %s root@%s\n' "$SSH_PORT" "$host"
     printf '  ssh -p %s -o PubkeyAuthentication=no -o PreferredAuthentications=password %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
   done
   printf '\n'

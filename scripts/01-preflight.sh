@@ -38,5 +38,5 @@ cat <<EOF
 Preflight 通过。建议下一步：
   sudo bash bootstrap.sh --phase ssh-phase1
 
-ssh-phase1 只会创建管理用户并开启公钥登录，不会禁用 root/密码。
+ssh-phase1 只会准备 root 公钥登录，不会禁用 root/密码。
 EOF

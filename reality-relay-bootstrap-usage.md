@@ -12,8 +12,8 @@
 
 ```text
 preflight      -> 检查系统、配置文件、SSH 基础条件
-ssh-phase1     -> 创建 admin 用户、安装 SSH 公钥，只开启公钥登录，不禁 root/密码
-ssh-final      -> 二阶段 SSH 最终加固，禁 root、禁密码、AllowUsers
+ssh-phase1     -> 给 root 安装 SSH 公钥，只开启公钥登录，不禁 root/密码
+ssh-final      -> 二阶段 SSH 最终加固，root 仅允许公钥登录，禁密码
 fail2ban       -> 安装并配置 fail2ban
 singbox        -> 安装 sing-box，生成 VLESS+Reality 多入口/多出口配置
 firewall       -> 安装/配置 UFW，只开放实际使用端口
@@ -33,7 +33,7 @@ rollback       -> 回滚 SSH 加固、sing-box 配置，可选处理 UFW
 
 1. **不要关闭当前已登录 SSH 窗口。**
 2. **`ssh-phase1` 不会禁 root，也不会禁密码。**
-3. **只有另开窗口确认 `admin` 可以用 SSH key 登录，并且 `sudo whoami` 输出 `root` 后，才执行 `ssh-final`。**
+3. **只有另开窗口确认 `root` 可以用 SSH key 登录后，才执行 `ssh-final`。**
 4. **UFW 启用前必须先放行当前 SSH 端口。脚本会自动放行实际使用的中转端口，但服务商安全组仍要你手动确认。**
 5. **不要公开以下文件：**
 
@@ -76,7 +76,6 @@ sudo bash install.sh
 | `SERVER_IP_IPv4` | 自动探测公网 IPv4，失败时为空 | 服务器公网 IPv4 |
 | `SERVER_IP_IPv6` | 空 | 服务器公网 IPv6，可不填 |
 | `SSH_PORT` | `22` | 当前 SSH 端口 |
-| `ADMIN_USER` | `admin` | 新建管理用户 |
 | `DIRECT_PORT` | `443` | VLESS+Reality 直连入口端口 |
 | `RESET_PROXY_KEYS` | `false` | 是否重置 VLESS UUID、Reality keypair 和 short-id |
 | `ENABLE_SUBSCRIPTION_SERVER` | `true` | 是否开启简单订阅端口 |
@@ -93,7 +92,7 @@ sudo bash install.sh
 2. 写出的 `config.env`、`home-proxies.csv` 和 `upstream-nodes.txt` 权限会设置为 `600`，不要公开。
 3. 选择一次性粘贴家宽代理时，可以带 `tag,type,server,server_port,username,password,network,listen_port` 表头；`listen_port` 可留空，粘贴完成后输入空行结束。
 4. 选择粘贴上游节点时，可以直接逐行粘贴普通 `vless://` 或 VLESS Reality 链接；也可以带 `tag,node_url,listen_port` 表头。
-5. 执行到 `ssh-phase1` 后，脚本会停下来提示你另开窗口测试 admin key 登录；只有你确认成功后，才继续执行 `ssh-final`、fail2ban、sing-box、UFW、验证和节点输出。
+5. 执行到 `ssh-phase1` 后，脚本会停下来提示你另开窗口测试 root key 登录；只有你确认成功后，才继续执行 `ssh-final`、fail2ban、sing-box、UFW、验证和节点输出。
 6. 如果只想生成配置、不自动跑部署阶段，可使用：
 
 ```bash
@@ -226,9 +225,9 @@ SERVER_IP_IPV4="1.2.3.4"
 SERVER_IP_IPV6=""
 SSH_PORT="22"
 INITIAL_USER="root"
-ADMIN_USER="admin"
+ADMIN_USER="root"
 ADMIN_PUBKEY="ssh-ed25519 AAAA...你的本地公钥"
-# 多个 admin 公钥可以写在同一个变量里：
+# 多个 root 公钥可以写在同一个变量里：
 # ADMIN_PUBKEY=$'ssh-ed25519 AAAA... user1\nssh-ed25519 BBBB... user2'
 # 或把额外公钥逐行写入 ADMIN_PUBKEYS。
 ADMIN_PUBKEYS=""
@@ -244,7 +243,6 @@ ENABLE_UFW="true"
 ENABLE_FAIL2BAN="true"
 ENABLE_IPV6_LISTEN="false"
 
-ADMIN_SUDO_NOPASSWD="true"
 SFTP_PUBKEY=""
 CSV_PATH="./home-proxies.csv"
 UPSTREAM_NODES_PATH="./upstream-nodes.txt"
@@ -283,11 +281,10 @@ CLASH_MIXED_PORT="7890"
 | `SERVER_IP_IPV6` | 服务器公网 IPv6，可为空 | `2001:db8::1` |
 | `SSH_PORT` | 当前 SSH 端口 | `22` |
 | `INITIAL_USER` | 服务商初始用户；当前仅作为预留/记录字段，实际 SSH 登录仍由你手动完成 | `root` |
-| `ADMIN_USER` | 新建管理用户 | `admin` |
+| `ADMIN_USER` | 兼容字段；当前固定使用 root，旧配置写其它值会被按 root 处理 | `root` |
 | `ADMIN_PUBKEY` | 本地 SSH 公钥；支持逐行多个 | `ssh-ed25519 AAAA...` |
-| `ADMIN_SUDO_NOPASSWD` | admin 是否免密 sudo | `true` |
 
-建议明确填写 `ADMIN_PUBKEY`。如果留空，脚本会尝试复制 `/root/.ssh/authorized_keys` 给 admin，但这依赖 root 当前已有正确公钥。
+建议明确填写 `ADMIN_PUBKEY`。如果留空，脚本会复用 `/root/.ssh/authorized_keys`，但这依赖 root 当前已有正确公钥。
 
 需要给多个管理员设备授权时，有两种写法：
 
@@ -623,7 +620,7 @@ sudo bash bootstrap.sh --phase preflight --config /root/reality-relay-bootstrap/
 `--yes` 当前为预留参数；危险步骤仍必须使用 `CONFIRM_*` 环境变量显式确认：
 
 ```bash
-CONFIRM_ADMIN_KEY_LOGIN=yes
+CONFIRM_ROOT_KEY_LOGIN=yes
 CONFIRM_USE_233BOY_INSTALLER=yes
 CONFIRM_ROLLBACK=yes
 ```
@@ -656,8 +653,7 @@ sudo bash bootstrap.sh --phase ssh-phase1
 这个阶段会做：
 
 - 安装基础包。
-- 创建 `ADMIN_USER`，默认是 `admin`。
-- 给 admin 安装 SSH 公钥。
+- 给 root 安装 SSH 公钥。
 - 如果启用 SFTP-only，创建 SFTP 用户和 chroot 目录。
 - 写入 SSH phase1 配置，只确保公钥登录可用。
 
@@ -665,16 +661,16 @@ sudo bash bootstrap.sh --phase ssh-phase1
 
 - 不会禁用 root SSH。
 - 不会禁用 SSH 密码登录。
-- 不会只允许 admin。
+- 不会只允许某个新建管理员用户。
 
-### 8.3 另开窗口测试 admin key 登录
+### 8.3 另开窗口测试 root key 登录
 
 不要关闭当前 root 窗口。
 
 在本地 Windows PowerShell 另开一个新窗口：
 
 ```powershell
-ssh -p 22 -o PreferredAuthentications=publickey -o PasswordAuthentication=no admin@服务器IP
+ssh -p 22 -o PreferredAuthentications=publickey -o PasswordAuthentication=no root@服务器IP
 ```
 
 如果端口不是 22，替换 `-p 22`。
@@ -683,32 +679,30 @@ ssh -p 22 -o PreferredAuthentications=publickey -o PasswordAuthentication=no adm
 
 ```bash
 whoami
-sudo whoami
 ```
 
 期望输出：
 
 ```text
-admin
 root
 ```
 
-只有这两条都成功，才能继续最终加固。
+只有 root key 登录成功，才能继续最终加固。
 
 ### 8.4 SSH final
 
 ```bash
-sudo CONFIRM_ADMIN_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final
+sudo CONFIRM_ROOT_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final
 ```
 
 这个阶段会做：
 
 - 备份 SSH 配置。
-- 禁止 root SSH 登录。
+- root SSH 只允许公钥登录。
 - 禁止 SSH 密码登录。
 - 禁止 keyboard-interactive/challenge-response 登录。
 - 设置 `AuthenticationMethods publickey`。
-- 设置 `AllowUsers admin`，如果启用 SFTP 用户则包含 SFTP 用户。
+- 设置 `AllowUsers root`，如果启用 SFTP 用户则包含 SFTP 用户。
 - 测试 `sshd -t`。
 - 检查 `sshd -T` 生效值。
 - 通过后 reload/restart SSH。
@@ -716,16 +710,14 @@ sudo CONFIRM_ADMIN_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final
 执行后再次另开窗口测试：
 
 ```powershell
-ssh -p 22 -o PreferredAuthentications=publickey -o PasswordAuthentication=no admin@服务器IP
-ssh -p 22 root@服务器IP
-ssh -p 22 -o PubkeyAuthentication=no -o PreferredAuthentications=password admin@服务器IP
+ssh -p 22 -o PreferredAuthentications=publickey -o PasswordAuthentication=no root@服务器IP
+ssh -p 22 -o PubkeyAuthentication=no -o PreferredAuthentications=password root@服务器IP
 ```
 
 预期：
 
-- admin key 登录成功。
-- root 登录失败。
-- 密码登录失败。
+- root key 登录成功。
+- root 密码登录失败。
 
 ### 8.5 安装 fail2ban
 
@@ -889,8 +881,8 @@ nano home-proxies.csv
 sudo bash bootstrap.sh --phase preflight
 sudo bash bootstrap.sh --phase ssh-phase1
 
-# 另开窗口测试 admin key 登录成功后：
-sudo CONFIRM_ADMIN_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final
+# 另开窗口测试 root key 登录成功后：
+sudo CONFIRM_ROOT_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final
 
 sudo bash bootstrap.sh --phase fail2ban
 sudo bash bootstrap.sh --phase singbox
@@ -1002,19 +994,13 @@ TcpTestSucceeded : True
 ### 12.2 测 SSH key 登录
 
 ```powershell
-ssh -p 22 -o PreferredAuthentications=publickey -o PasswordAuthentication=no admin@服务器IP
+ssh -p 22 -o PreferredAuthentications=publickey -o PasswordAuthentication=no root@服务器IP
 ```
 
-### 12.3 测 root 登录应失败
+### 12.3 测 root 密码登录应失败
 
 ```powershell
-ssh -p 22 root@服务器IP
-```
-
-### 12.4 测密码登录应失败
-
-```powershell
-ssh -p 22 -o PubkeyAuthentication=no -o PreferredAuthentications=password admin@服务器IP
+ssh -p 22 -o PubkeyAuthentication=no -o PreferredAuthentications=password root@服务器IP
 ```
 
 ---
@@ -1263,25 +1249,25 @@ sudo ls -lah /root/reality-relay-bootstrap-backups/
 
 ```bash
 sudo /usr/sbin/sshd -t
-sudo /usr/sbin/sshd -T -C user=admin,host=localhost,addr=127.0.0.1
+sudo /usr/sbin/sshd -T -C user=root,host=localhost,addr=127.0.0.1
 ```
 
-### 19.2 admin key 登录失败
+### 19.2 root key 登录失败
 
 不要执行 `ssh-final`。先检查：
 
 ```bash
-ls -ld /home/admin /home/admin/.ssh
-ls -l /home/admin/.ssh/authorized_keys
-sudo cat /home/admin/.ssh/authorized_keys
+ls -ld /root /root/.ssh
+ls -l /root/.ssh/authorized_keys
+sudo cat /root/.ssh/authorized_keys
 ```
 
 权限应类似：
 
 ```text
-/home/admin                       admin:admin  700 或 750
-/home/admin/.ssh                  admin:admin  700
-/home/admin/.ssh/authorized_keys  admin:admin  600
+/root                       root:root  700 或 750
+/root/.ssh                  root:root  700
+/root/.ssh/authorized_keys  root:root  600
 ```
 
 ### 19.3 `ssh-final` 后新窗口登录失败
@@ -1415,18 +1401,16 @@ sudo bash bootstrap.sh --phase validate
 部署完成后逐项确认：
 
 ```text
-[ ] config.env 已填写 SERVER_IP、ADMIN_USER、至少一个 ADMIN_PUBKEY
+[ ] config.env 已填写 SERVER_IP、至少一个 ADMIN_PUBKEY
 [ ] home-proxies.csv 表头正确
 [ ] CSV 里没有 443
 [ ] CSV listen_port 没有重复
 [ ] 密码里有英文逗号时已使用英文双引号
 [ ] preflight 通过
 [ ] ssh-phase1 通过
-[ ] 另开窗口 admin key 登录成功
-[ ] admin 执行 sudo whoami 输出 root
+[ ] 另开窗口 root key 登录成功
 [ ] ssh-final 已执行
-[ ] root SSH 登录失败
-[ ] 密码 SSH 登录失败
+[ ] root 密码 SSH 登录失败
 [ ] fail2ban active
 [ ] sing-box check 通过
 [ ] sing-box active
@@ -1460,8 +1444,8 @@ nano home-proxies.csv
 sudo bash bootstrap.sh --phase preflight
 sudo bash bootstrap.sh --phase ssh-phase1
 
-# 另开窗口测试 admin key 登录和 sudo 成功后：
-sudo CONFIRM_ADMIN_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final
+# 另开窗口测试 root key 登录成功后：
+sudo CONFIRM_ROOT_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final
 
 sudo bash bootstrap.sh --phase fail2ban
 sudo bash bootstrap.sh --phase singbox

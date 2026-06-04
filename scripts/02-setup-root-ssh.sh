@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
-# 创建 admin 管理用户和可选 SFTP-only 用户，安装 SSH 公钥。
+# 为 root 安装 SSH 公钥，并可选创建 SFTP-only 用户。
 set -Eeuo pipefail
-PHASE_NAME="create-admin"
+PHASE_NAME="setup-root-ssh"
 source "${RRB_PROJECT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}/scripts/00-lib.sh"
 require_root
 load_config
 require_supported_os
 
-backup_path /etc/sudoers.d || true
-apt_install sudo openssh-server
+apt_install openssh-server
 
-get_pubkey_for_admin() {
+get_pubkey_for_root() {
   if [[ -n "$ADMIN_PUBKEY" ]]; then
     printf '%s\n' "$ADMIN_PUBKEY"
   elif [[ -s /root/.ssh/authorized_keys ]]; then
@@ -62,27 +61,14 @@ install_authorized_keys() {
   chmod go-w "$home" || true
 }
 
-admin_keys="$(get_pubkey_for_admin || true)"
-[[ -n "$admin_keys" ]] || die "没有可用 ADMIN_PUBKEY，也无法从 /root/.ssh/authorized_keys 复制。"
+root_keys="$(get_pubkey_for_root || true)"
+[[ -n "$root_keys" ]] || die "没有可用 ADMIN_PUBKEY，也无法从 /root/.ssh/authorized_keys 复制。"
 
-create_user_if_needed "$ADMIN_USER" /bin/bash
-run usermod -aG sudo "$ADMIN_USER"
-run passwd -l "$ADMIN_USER" || true
-install_authorized_keys "$ADMIN_USER" "$admin_keys"
-
-if [[ "$ADMIN_SUDO_NOPASSWD" == "true" ]]; then
-  write_root_file "/etc/sudoers.d/90-reality-relay-bootstrap-${ADMIN_USER}" 0440 <<EOF
-# Managed by reality-relay-bootstrap. Admin password is locked; sudo uses key-protected SSH login.
-${ADMIN_USER} ALL=(ALL) NOPASSWD:ALL
-EOF
-  if ! is_dry_run; then
-    visudo -cf "/etc/sudoers.d/90-reality-relay-bootstrap-${ADMIN_USER}" >/dev/null
-  fi
-fi
+install_authorized_keys root "$root_keys"
 
 if [[ "$ENABLE_SFTP_USER" == "true" ]]; then
   NOLOGIN="$(command -v nologin || echo /usr/sbin/nologin)"
-  sftp_keys="${SFTP_PUBKEY:-$admin_keys}"
+  sftp_keys="${SFTP_PUBKEY:-$root_keys}"
   create_user_if_needed "$SFTP_USER" "$NOLOGIN"
   run passwd -l "$SFTP_USER" || true
   install_authorized_keys "$SFTP_USER" "$sftp_keys"
@@ -106,8 +92,7 @@ fi
 cat <<EOF
 
 用户准备完成：
-  管理用户：$ADMIN_USER
-  sudo NOPASSWD：$ADMIN_SUDO_NOPASSWD
+  SSH 用户：root
   SFTP 用户：$sftp_status
 
 下一步会写入 phase1 SSH drop-in，只开启公钥登录，不禁 root/密码。
