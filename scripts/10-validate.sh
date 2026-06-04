@@ -312,13 +312,13 @@ fi
 
 cat <<EOF
 
-验证完成。Windows PowerShell 建议继续测试：
+验证完成。建议从外部 Debian/Linux 继续测试：
 
 $(if [[ -n "$(server_ipv4_hosts)" ]]; then
   printf 'IPv4:\n'
   for host in $(server_ipv4_hosts); do
     for port in "${PORTS[@]}"; do
-      printf '  Test-NetConnection %s -Port %s\n' "$host" "$port"
+      printf "  python3 -c 'import socket,sys; s=socket.create_connection((sys.argv[1], int(sys.argv[2])), 5); s.close(); print(\"TCP OK\")' %q %q\n" "$host" "$port"
     done
     printf '\n'
     printf '  ssh -p %s -o PreferredAuthentications=publickey -o PasswordAuthentication=no %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
@@ -330,7 +330,7 @@ $(if [[ -n "$(server_ipv6_hosts)" ]]; then
   printf '\nIPv6:\n'
   for host in $(server_ipv6_hosts); do
     for port in "${PORTS[@]}"; do
-      printf '  Test-NetConnection %s -Port %s\n' "$host" "$port"
+      printf "  python3 -c 'import socket,sys; s=socket.create_connection((sys.argv[1], int(sys.argv[2])), 5); s.close(); print(\"TCP OK\")' %q %q\n" "$host" "$port"
     done
     printf '\n'
     printf '  ssh -p %s -o PreferredAuthentications=publickey -o PasswordAuthentication=no %s@%s\n' "$SSH_PORT" "$ADMIN_USER" "$host"
