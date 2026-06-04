@@ -433,7 +433,7 @@ collect_home_proxies() {
   line
   printf '%b\n' "${CYAN}${BOLD}家宽代理配置${RESET}"
   printf '%b\n' "${DIM}每一行会生成一个 VLESS+Reality 入口端口；如暂时没有家宽代理，可以不添加。${RESET}"
-  if read_yes_no "是否一次性粘贴多行家宽代理 CSV？" no; then
+  if read_yes_no "是否一次性粘贴多行家宽代理 CSV？" yes; then
     collect_home_proxies_bulk "$rows_file" || warn "没有粘贴任何家宽代理行。"
   fi
   if [[ ! -s "$rows_file" ]]; then
@@ -452,7 +452,7 @@ collect_upstream_nodes() {
   line
   printf '%b\n' "${CYAN}${BOLD}上游节点配置${RESET}"
   printf '%b\n' "${DIM}可选：把别人给你的普通 vless:// 或 VLESS Reality 节点接到新的入口端口。${RESET}"
-  if ! read_yes_no "是否粘贴上游节点分享链接或 CSV？" no; then
+  if ! read_yes_no "是否粘贴上游节点分享链接或 CSV？" yes; then
     return 0
   fi
 
@@ -518,7 +518,7 @@ run_install_flow() {
   fi
   printf '\n  whoami\n\n'
   printf '确认输出为 root 后，再回到这里继续。\n'
-  if read_yes_no "我已确认 root 公钥登录正常，继续 SSH final 加固？" no; then
+  if read_yes_no "我已确认 root 公钥登录正常，继续 SSH final 加固？" yes; then
     CONFIRM_ROOT_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final
   else
     warn "已暂停在 ssh-phase1。之后可手动执行：sudo CONFIRM_ROOT_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final"
