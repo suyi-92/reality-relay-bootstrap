@@ -18,9 +18,10 @@ mapfile -t PORTS < <(python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --confi
 [[ "${#PORTS[@]}" -ge 1 ]] || die "未解析到 VLESS+Reality 端口。"
 
 cleanup_rrb_ufw_rules() {
-  local desired_file stale_file number
+  local desired_file stale_file status_file number
   desired_file="$(mktemp)"
   stale_file="$(mktemp)"
+  status_file="$(mktemp)"
 
   printf '%s/tcp\n' "$SSH_PORT" >"$desired_file"
   for port in "${PORTS[@]}"; do
@@ -32,18 +33,24 @@ cleanup_rrb_ufw_rules() {
 
   if ! command -v ufw >/dev/null 2>&1; then
     log "DRY-RUN: ufw 尚未安装，跳过本项目旧规则计算。"
-    rm -f "$desired_file" "$stale_file"
+    rm -f "$desired_file" "$stale_file" "$status_file"
     return 0
   fi
 
-  ufw status numbered 2>/dev/null | python3 - "$desired_file" >"$stale_file" <<'PY'
+  if ! ufw status numbered >"$status_file" 2>/dev/null; then
+    warn "读取 UFW 规则失败，跳过本项目旧规则清理。"
+    rm -f "$desired_file" "$stale_file" "$status_file"
+    return 0
+  fi
+
+  python3 - "$desired_file" "$status_file" >"$stale_file" <<'PY'
 import re
 import sys
 from pathlib import Path
 
 desired = {line.strip() for line in Path(sys.argv[1]).read_text(encoding="utf-8").splitlines() if line.strip()}
 stale = []
-for line in sys.stdin:
+for line in Path(sys.argv[2]).read_text(encoding="utf-8", errors="replace").splitlines():
     if "reality-relay-bootstrap" not in line:
         continue
     number_match = re.search(r"^\[\s*(\d+)\]", line)
@@ -61,7 +68,7 @@ PY
     info "清理不再使用的本项目 UFW 规则。"
     if is_dry_run; then
       log "DRY-RUN: 将删除本项目旧 UFW 规则编号：$(tr '\n' ' ' <"$stale_file")"
-      rm -f "$desired_file" "$stale_file"
+      rm -f "$desired_file" "$stale_file" "$status_file"
       return 0
     fi
     while IFS= read -r number; do
@@ -69,7 +76,7 @@ PY
       run ufw --force delete "$number"
     done <"$stale_file"
   fi
-  rm -f "$desired_file" "$stale_file"
+  rm -f "$desired_file" "$stale_file" "$status_file"
 }
 
 cleanup_rrb_ufw_rules
