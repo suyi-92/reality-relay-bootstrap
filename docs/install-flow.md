@@ -15,6 +15,18 @@ nano upstream-nodes.txt
 
 `upstream-nodes.txt` 是可选文件，用来接入上游节点分享链接。当前只支持 `vless://...security=none...` 和 `vless://...security=reality...`。推荐写 `tag,node_url,listen_port`，也可逐行只写节点链接让脚本自动分配端口；旧 `tag,listen_port,node_url` 仍兼容。
 
+如需启用自有域名，DNS 默认按 Cloudflare 灰云 / DNS only 处理，A/AAAA 指向服务器公网 IP，并在 `config.env` 填写：
+
+```bash
+ENABLE_CUSTOM_DOMAIN="true"
+CUSTOM_DOMAIN="edge.example.com"
+LE_EMAIL="admin@example.com"
+CLOUDFLARE_API_TOKEN="Cloudflare DNS API Token"
+NGINX_FALLBACK_PORT="8443"
+```
+
+启用后公网 `443` 仍由 sing-box 监听，普通 TLS fallback 到本机 Nginx `127.0.0.1:8443`。
+
 ## 2. SSH 初始化与加固
 
 ```bash
@@ -55,6 +67,7 @@ sudo bash bootstrap.sh --phase singbox
 5. 执行 `sing-box check`。
 6. 通过后重启 sing-box。
 7. 如果 `ENABLE_SUBSCRIPTION_SERVER=true`，生成并启动订阅服务；不会默认输出 `/root` 节点文件。
+8. 如果 `ENABLE_CUSTOM_DOMAIN=true`，通过 Cloudflare DNS-01 申请证书并配置 Nginx fallback。
 
 如需在服务器本地额外生成节点文件，可在部署完成后手动执行：
 
@@ -70,7 +83,7 @@ sudo bash bootstrap.sh --phase firewall
 
 UFW 只放行 SSH、`DIRECT_PORT`、`home-proxies.csv` 和 `upstream-nodes.txt` 中实际使用的 `listen_port`。服务商安全组也要手动放行同样端口。
 
-如果 `ENABLE_SUBSCRIPTION_SERVER=true`，还会放行 `SUBSCRIPTION_PORT`，默认是 `51040`。
+如果 `ENABLE_SUBSCRIPTION_SERVER=true` 且未启用自有域名，还会放行 `SUBSCRIPTION_PORT`，默认是 `51040`。启用自有域名时，订阅服务只绑定本机并由 Nginx fallback 反代，不开放订阅端口。
 
 ## 6. 验证
 

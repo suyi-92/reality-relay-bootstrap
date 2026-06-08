@@ -20,6 +20,7 @@ firewall       -> 安装/配置 UFW，只开放实际使用端口
 validate       -> 验证 SSH、fail2ban、UFW、sing-box、监听端口、家宽代理和上游节点
 output-nodes   -> 可选生成客户端节点文件
 subscription   -> 单独安装/更新简单订阅端口
+custom-domain  -> 可选配置 Cloudflare DNS-01 证书和本机 Nginx fallback
 rollback       -> 回滚 SSH 加固、sing-box 配置，可选处理 UFW
 ```
 
@@ -77,6 +78,10 @@ sudo bash install.sh
 | `SERVER_IP_IPv6` | 空 | 服务器公网 IPv6，可不填 |
 | `SSH_PORT` | `22` | 当前 SSH 端口 |
 | `DIRECT_PORT` | `443` | VLESS+Reality 直连入口端口 |
+| `ENABLE_CUSTOM_DOMAIN` | `false` | 是否启用自有域名、Cloudflare DNS-01 和 Nginx fallback |
+| `CUSTOM_DOMAIN` | 空 | 自有域名；启用后节点 server/servername 使用它 |
+| `LE_EMAIL` | 空 | Let's Encrypt 注册邮箱；启用自有域名时必填 |
+| `CLOUDFLARE_API_TOKEN` | 空 | Cloudflare DNS API Token；用于 DNS-01 申请证书 |
 | `RESET_PROXY_KEYS` | `false` | 是否重置 VLESS UUID、Reality keypair 和 short-id |
 | `ENABLE_SUBSCRIPTION_SERVER` | `true` | 是否开启简单订阅端口 |
 | `SUBSCRIPTION_PORT` | `51040` | 订阅端口；仅开启订阅服务时询问 |
@@ -247,6 +252,16 @@ SFTP_PUBKEY=""
 CSV_PATH="./home-proxies.csv"
 UPSTREAM_NODES_PATH="./upstream-nodes.txt"
 RRB_STATE_DIR="/etc/reality-relay-bootstrap"
+ENABLE_CUSTOM_DOMAIN="false"
+CUSTOM_DOMAIN=""
+CUSTOM_DOMAIN_PROVIDER="cloudflare"
+LE_EMAIL=""
+LE_STAGING="false"
+CLOUDFLARE_API_TOKEN=""
+CLOUDFLARE_API_TOKEN_FILE="/etc/reality-relay-bootstrap/cloudflare.ini"
+CLOUDFLARE_DNS_PROPAGATION_SECONDS="60"
+NGINX_FALLBACK_HOST="127.0.0.1"
+NGINX_FALLBACK_PORT="8443"
 SINGBOX_CONFIG_PATH="/etc/sing-box/config.json"
 
 PROXY_PROTOCOL="vless-reality"
@@ -475,6 +490,18 @@ www.microsoft.com
 ```
 
 如果要换成其他网站，建议选一个稳定、真实、支持 TLS 443 的大站域名，并确保客户端节点里的 `servername` 和服务端一致。
+
+如果启用自有域名：
+
+```bash
+ENABLE_CUSTOM_DOMAIN="true"
+CUSTOM_DOMAIN="edge.example.com"
+LE_EMAIL="admin@example.com"
+CLOUDFLARE_API_TOKEN="Cloudflare DNS API Token"
+NGINX_FALLBACK_PORT="8443"
+```
+
+脚本默认按 Cloudflare DNS 灰云 / DNS only 处理。公网 `443` 继续由 sing-box 监听，普通 TLS fallback 到本机 Nginx `127.0.0.1:8443`；`REALITY_SERVER_NAME` 会自动回填为 `CUSTOM_DOMAIN`，`REALITY_HANDSHAKE_SERVER` 会回填为 `127.0.0.1`，`REALITY_HANDSHAKE_PORT` 会回填为 `NGINX_FALLBACK_PORT`。订阅服务启用时只绑定本机，并通过 `https://CUSTOM_DOMAIN/sub/<VLESS_UUID>?target=ClashMeta` 对外访问。
 
 ### 5.7 客户端输出变量
 
@@ -752,6 +779,7 @@ sudo bash bootstrap.sh --phase singbox
 - 执行 `sing-box check -c /etc/sing-box/config.json`。
 - check 通过后重启 sing-box。
 - 如果 `ENABLE_SUBSCRIPTION_SERVER=true`，生成并启动订阅服务。
+- 如果 `ENABLE_CUSTOM_DOMAIN=true`，使用 Cloudflare DNS-01 申请 Let's Encrypt 证书，并配置本机 Nginx fallback。
 
 生成后的重要文件：
 
@@ -777,9 +805,12 @@ sudo bash bootstrap.sh --phase firewall
 SSH_PORT
 DIRECT_PORT
 home-proxies.csv 里的每个 listen_port
+upstream-nodes.txt 里的每个 listen_port
+SUBSCRIPTION_PORT（仅 ENABLE_SUBSCRIPTION_SERVER=true 且未启用自有域名）
 ```
 
 不会默认开放从 `51043` 起的整段端口范围。
+启用自有域名时，订阅服务只监听本机并由 Nginx fallback 反代，UFW 不开放 `SUBSCRIPTION_PORT`。
 
 执行后查看：
 
@@ -798,6 +829,7 @@ sudo ufw status verbose
 TCP SSH_PORT，例如 22
 TCP DIRECT_PORT，例如 443
 TCP 每个 CSV listen_port，例如 51043、51044
+TCP 每个 upstream-nodes listen_port
 ```
 
 不要只改服务器 UFW，不改服务商安全组。很多云厂商还有外层防火墙。
@@ -856,12 +888,19 @@ sudo bash bootstrap.sh --phase firewall
 http://服务器IP:51040/sub/<VLESS_UUID>?target=ClashMeta
 ```
 
-`<VLESS_UUID>` 来自 `/etc/reality-relay-bootstrap/vless-uuid.txt`。内置订阅服务是 HTTP；如需 HTTPS，请在外层接入带证书的反向代理，并把 `SUBSCRIPTION_BASE_URL` 设置为反代外部地址。仍建议只在服务商安全组里放行你的常用来源 IP。
+启用自有域名时：
+
+```text
+https://CUSTOM_DOMAIN/sub/<VLESS_UUID>?target=ClashMeta
+```
+
+`<VLESS_UUID>` 来自 `/etc/reality-relay-bootstrap/vless-uuid.txt`。内置订阅服务是 HTTP；未启用自有域名时如需 HTTPS，请在外层接入带证书的反向代理，并把 `SUBSCRIPTION_BASE_URL` 设置为反代外部地址。启用自有域名时，订阅服务只监听本机，外部 HTTPS 由 sing-box Reality fallback 到 Nginx 后反代。
 
 `SUBSCRIPTION_TARGET` 当前只生成 ClashMeta/Mihomo YAML；旧配置里的其它 target 会警告并按 ClashMeta 处理，旧 URL target 不再兼容。
 
 如果同时配置了 IPv4 和 IPv6，两个订阅链接都返回同一份完整节点；IPv4 节点名称保持不变，IPv6 节点名称追加 `-IPv6`。
 如果 Clash Verge 或浏览器无法导入 IPv6 字面量订阅地址，有 IPv4 时直接用 IPv4 订阅地址即可，它会返回同一份完整节点。
+启用自有域名时，节点 `server` 使用域名，不再生成 IPv6 字面量副本。
 
 ---
 
@@ -886,6 +925,7 @@ sudo CONFIRM_ROOT_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final
 
 sudo bash bootstrap.sh --phase fail2ban
 sudo bash bootstrap.sh --phase singbox
+sudo bash bootstrap.sh --phase custom-domain   # 可选；singbox phase 已会自动调用
 sudo bash bootstrap.sh --phase firewall
 sudo bash bootstrap.sh --phase validate
 ```

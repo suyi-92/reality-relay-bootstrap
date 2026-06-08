@@ -22,6 +22,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 
 TAG_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 DOMAIN_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+CUSTOM_DOMAIN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$")
 UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 SHORT_ID_RE = re.compile(r"^[0-9a-fA-F]{0,16}$")
 REQUIRED_COLUMNS = {
@@ -162,6 +163,18 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
         "CSV_PATH": "./home-proxies.csv",
         "UPSTREAM_NODES_PATH": "./upstream-nodes.txt",
         "RRB_STATE_DIR": state_dir,
+        "ENABLE_CUSTOM_DOMAIN": "false",
+        "CUSTOM_DOMAIN": "",
+        "CUSTOM_DOMAIN_PROVIDER": "cloudflare",
+        "LE_EMAIL": "",
+        "LE_STAGING": "false",
+        "CLOUDFLARE_API_TOKEN": "",
+        "CLOUDFLARE_API_TOKEN_FILE": f"{state_dir}/cloudflare.ini",
+        "CLOUDFLARE_DNS_PROPAGATION_SECONDS": "60",
+        "NGINX_FALLBACK_HOST": "127.0.0.1",
+        "NGINX_FALLBACK_PORT": "8443",
+        "NGINX_FALLBACK_ROOT": "/var/www/reality-relay-bootstrap",
+        "NGINX_FALLBACK_CONF": "/etc/nginx/sites-available/reality-relay-bootstrap.conf",
         "SINGBOX_CONFIG_PATH": "/etc/sing-box/config.json",
         "VLESS_UUID_PATH": f"{state_dir}/vless-uuid.txt",
         "VLESS_FLOW": "xtls-rprx-vision",
@@ -197,6 +210,8 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
     if merged.get("ADMIN_USER", "root") != "root":
         print(f"WARN: ADMIN_USER={merged.get('ADMIN_USER')} 已废弃；当前统一使用 root。", file=sys.stderr)
         merged["ADMIN_USER"] = "root"
+
+    apply_custom_domain_defaults(merged)
     merged["SUBSCRIPTION_TARGET"] = normalize_subscription_target(merged.get("SUBSCRIPTION_TARGET", "ClashMeta"))
 
     default_state_dir = "/etc/reality-relay-bootstrap"
@@ -206,11 +221,32 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
             "REALITY_PRIVATE_KEY_PATH": "reality-private.key",
             "REALITY_PUBLIC_KEY_PATH": "reality-public.key",
             "REALITY_SHORT_ID_PATH": "reality-short-id.txt",
+            "CLOUDFLARE_API_TOKEN_FILE": "cloudflare.ini",
         }
         for key, filename in default_paths.items():
             if merged.get(key) == f"{default_state_dir}/{filename}":
                 merged[key] = f"{merged['RRB_STATE_DIR']}/{filename}"
     return merged
+
+
+def custom_domain_enabled(env: Dict[str, str]) -> bool:
+    return env.get("ENABLE_CUSTOM_DOMAIN", "false").lower() == "true"
+
+
+def apply_custom_domain_defaults(env: Dict[str, str]) -> None:
+    if not custom_domain_enabled(env):
+        return
+    domain = env.get("CUSTOM_DOMAIN", "").strip()
+    if not domain:
+        return
+    if env.get("REALITY_SERVER_NAME", "") in {"", "www.microsoft.com"}:
+        env["REALITY_SERVER_NAME"] = domain
+    if env.get("REALITY_HANDSHAKE_SERVER", "") in {"", "www.microsoft.com"}:
+        env["REALITY_HANDSHAKE_SERVER"] = env.get("NGINX_FALLBACK_HOST", "127.0.0.1")
+    if env.get("REALITY_HANDSHAKE_PORT", "") in {"", "443"}:
+        env["REALITY_HANDSHAKE_PORT"] = env.get("NGINX_FALLBACK_PORT", "8443")
+    if env.get("ENABLE_SUBSCRIPTION_SERVER", "true").lower() == "true" and not env.get("SUBSCRIPTION_BASE_URL", ""):
+        env["SUBSCRIPTION_BASE_URL"] = f"https://{domain}"
 
 
 def normalize_subscription_target(value: str) -> str:
@@ -256,12 +292,23 @@ def as_port(env: Dict[str, str], key: str) -> int:
     return port
 
 
+def as_nonnegative_int(env: Dict[str, str], key: str) -> int:
+    value = env.get(key, "")
+    if not value.isdigit():
+        raise ConfigError(f"{key} 必须是非负整数，当前：{value}")
+    return int(value)
+
+
 def resolve_path(env: Dict[str, str], key: str, base: Path) -> Path:
     value = env[key]
     p = Path(value)
     if not p.is_absolute():
         p = base / value.lstrip("./")
     return p
+
+
+def is_posix_absolute(value: str) -> bool:
+    return value.startswith("/")
 
 
 def validate_env(env: Dict[str, str]) -> None:
@@ -271,6 +318,8 @@ def validate_env(env: Dict[str, str]) -> None:
     end = as_port(env, "HOME_PORT_END")
     as_port(env, "REALITY_HANDSHAKE_PORT")
     as_port(env, "SUBSCRIPTION_PORT")
+    fallback_port = as_port(env, "NGINX_FALLBACK_PORT")
+    as_nonnegative_int(env, "CLOUDFLARE_DNS_PROPAGATION_SECONDS")
     if start > end:
         raise ConfigError("HOME_PORT_START 不能大于 HOME_PORT_END")
     if env["PROXY_PROTOCOL"] != "vless-reality":
@@ -294,6 +343,8 @@ def validate_env(env: Dict[str, str]) -> None:
         "ENABLE_UFW",
         "ENABLE_FAIL2BAN",
         "ENABLE_IPV6_LISTEN",
+        "ENABLE_CUSTOM_DOMAIN",
+        "LE_STAGING",
         "REJECT_CN_PRIVATE",
         "CLIENT_UDP",
         "ENABLE_SUBSCRIPTION_SERVER",
@@ -301,6 +352,29 @@ def validate_env(env: Dict[str, str]) -> None:
     ]:
         as_bool(env, key)
     normalize_subscription_target(env.get("SUBSCRIPTION_TARGET", "ClashMeta"))
+    if env["CUSTOM_DOMAIN_PROVIDER"] != "cloudflare":
+        raise ConfigError("CUSTOM_DOMAIN_PROVIDER 当前只支持 cloudflare")
+    for key in ["CLOUDFLARE_API_TOKEN_FILE", "NGINX_FALLBACK_ROOT", "NGINX_FALLBACK_CONF"]:
+        if not is_posix_absolute(env[key]):
+            raise ConfigError(f"{key} 必须是绝对路径")
+    if custom_domain_enabled(env):
+        domain = env.get("CUSTOM_DOMAIN", "").strip()
+        if not domain:
+            raise ConfigError("ENABLE_CUSTOM_DOMAIN=true 时 CUSTOM_DOMAIN 不能为空")
+        if not CUSTOM_DOMAIN_RE.match(domain) or "." not in domain or ".." in domain:
+            raise ConfigError(f"CUSTOM_DOMAIN 不合法：{domain}")
+        if not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", env.get("LE_EMAIL", "")):
+            raise ConfigError("ENABLE_CUSTOM_DOMAIN=true 时 LE_EMAIL 必须是有效邮箱")
+        if direct_port != 443:
+            raise ConfigError("ENABLE_CUSTOM_DOMAIN=true 要求 DIRECT_PORT=443（公网 443 由 sing-box 接管）")
+        if fallback_port in {direct_port, as_port(env, "SSH_PORT"), as_port(env, "SUBSCRIPTION_PORT")}:
+            raise ConfigError("NGINX_FALLBACK_PORT 不能与 DIRECT_PORT、SSH_PORT 或 SUBSCRIPTION_PORT 相同")
+        if env["REALITY_SERVER_NAME"] != domain:
+            raise ConfigError("启用自有域名时 REALITY_SERVER_NAME 必须等于 CUSTOM_DOMAIN")
+        if env["REALITY_HANDSHAKE_SERVER"] != env["NGINX_FALLBACK_HOST"]:
+            raise ConfigError("启用自有域名时 REALITY_HANDSHAKE_SERVER 必须等于 NGINX_FALLBACK_HOST")
+        if env["REALITY_HANDSHAKE_PORT"] != env["NGINX_FALLBACK_PORT"]:
+            raise ConfigError("启用自有域名时 REALITY_HANDSHAKE_PORT 必须等于 NGINX_FALLBACK_PORT")
     if direct_port != 443:
         print(f"WARN: DIRECT_PORT={direct_port}，不是默认 443。", file=sys.stderr)
 
@@ -942,6 +1016,8 @@ def print_summary(env: Dict[str, str], rows: List[Dict[str, Any]]) -> None:
     print(f"443 模式：{env['MODE_443']}，端口：{env['DIRECT_PORT']}")
     print(f"Reality server_name：{env['REALITY_SERVER_NAME']}")
     print(f"Reality handshake：{env['REALITY_HANDSHAKE_SERVER']}:{env['REALITY_HANDSHAKE_PORT']}")
+    if custom_domain_enabled(env):
+        print(f"自有域名：{env['CUSTOM_DOMAIN']}（Cloudflare DNS 灰云；Nginx fallback {env['NGINX_FALLBACK_HOST']}:{env['NGINX_FALLBACK_PORT']}）")
     if env["MODE_443"] == "smart":
         outbound, tag = select_ai_outbound(env, rows)
         print(f"Smart 443 AI 出口：{tag} ({outbound})")

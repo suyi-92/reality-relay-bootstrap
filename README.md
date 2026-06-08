@@ -41,6 +41,7 @@ reality-relay-bootstrap/
     12-rollback.sh
     13-setup-subscription.sh
     13-subscription-server.py
+    14-setup-custom-domain.sh
   templates/
     sshd-hardening.conf.tpl
     fail2ban-sshd.local.tpl
@@ -55,7 +56,7 @@ reality-relay-bootstrap/
 
 更详细的参数解释、Windows PowerShell 示例、回滚和客户端导入说明，请阅读 [`reality-relay-bootstrap-usage.md`](./reality-relay-bootstrap-usage.md)。
 
-如果是在全新 VPS 上使用推荐默认值部署，可以直接运行一键安装脚本。脚本会自动拉取/定位项目、生成 `config.env`、`home-proxies.csv` 和 `upstream-nodes.txt`，会提示填写服务器 IPv4/IPv6、SSH、入口端口、节点订阅配置、root 公钥、家宽代理 CSV 以及可选上游节点：
+如果是在全新 VPS 上使用推荐默认值部署，可以直接运行一键安装脚本。脚本会自动拉取/定位项目、生成 `config.env`、`home-proxies.csv` 和 `upstream-nodes.txt`，会提示填写服务器 IPv4/IPv6、SSH、入口端口、自有域名、节点订阅配置、root 公钥、家宽代理 CSV 以及可选上游节点：
 
 ```bash
 bash <(wget -qO- https://raw.githubusercontent.com/suyi-92/reality-relay-bootstrap/main/install.sh)
@@ -154,6 +155,30 @@ CLIENT_ALPN="h2,http/1.1"
 
 这些文件权限为 600。`home-proxies.csv` 和 `upstream-nodes.txt` 也会以 600 权限复制到 `/etc/reality-relay-bootstrap/`。不要公开 Reality 私钥、UUID、CSV、上游节点和节点文件。
 
+## 自有域名与 Nginx fallback
+
+可选启用自有域名。默认假设 DNS 托管在 Cloudflare，记录保持灰云 / DNS only，A/AAAA 指向服务器公网 IP：
+
+```bash
+ENABLE_CUSTOM_DOMAIN="true"
+CUSTOM_DOMAIN="edge.example.com"
+LE_EMAIL="admin@example.com"
+CLOUDFLARE_API_TOKEN="Cloudflare DNS API Token"
+CLOUDFLARE_API_TOKEN_FILE="/etc/reality-relay-bootstrap/cloudflare.ini"
+NGINX_FALLBACK_HOST="127.0.0.1"
+NGINX_FALLBACK_PORT="8443"
+```
+
+启用后：
+
+- 公网 `tcp/443` 仍由 sing-box VLESS+Reality 监听。
+- 普通 HTTPS/TLS fallback 到本机 `127.0.0.1:8443` 的 Nginx。
+- 证书通过 certbot `dns-cloudflare` 插件使用 Cloudflare DNS-01 申请 Let’s Encrypt。
+- 节点输出里的 `server` 和 `servername` 会使用 `CUSTOM_DOMAIN`。
+- 如果启用订阅服务，订阅 URL 默认为 `https://CUSTOM_DOMAIN/sub/<VLESS_UUID>?target=ClashMeta`，订阅服务只绑定本机并由 Nginx 反代。
+
+Cloudflare API Token 只需要对应 zone 的 DNS 编辑权限；脚本会把 token 写入 600 权限的 credentials 文件。不要打开橙云代理，否则 Reality 443 入口不会直连到服务器。
+
 ## 443 模式
 
 ```bash
@@ -211,6 +236,7 @@ sudo CONFIRM_ROOT_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final
 
 sudo bash bootstrap.sh --phase fail2ban
 sudo bash bootstrap.sh --phase singbox
+sudo bash bootstrap.sh --phase custom-domain   # 仅 ENABLE_CUSTOM_DOMAIN=true 时需要；singbox phase 也会自动调用
 sudo bash bootstrap.sh --phase firewall
 sudo bash bootstrap.sh --phase validate
 ```
@@ -294,7 +320,7 @@ sudo bash bootstrap.sh --phase firewall
 http://服务器IP:51040/sub/<VLESS_UUID>?target=ClashMeta
 ```
 
-内置服务是 HTTP，URL 里的 token 使用 `/etc/reality-relay-bootstrap/vless-uuid.txt`。仍建议只在服务商安全组里放行你的常用来源 IP。
+内置服务是 HTTP，URL 里的 token 使用 `/etc/reality-relay-bootstrap/vless-uuid.txt`。未启用自有域名时，仍建议只在服务商安全组里放行你的常用来源 IP。启用自有域名时，订阅服务只监听本机，外部通过 `https://CUSTOM_DOMAIN/sub/<token>?target=ClashMeta` 访问。
 `SUBSCRIPTION_TARGET` 当前只生成 ClashMeta/Mihomo YAML；旧配置里的其它 target 会警告并按 ClashMeta 处理，旧 URL target 不再兼容。
 如果同时配置了 IPv4 和 IPv6，两个订阅链接都返回同一份完整节点；IPv4 节点名称保持不变，IPv6 节点名称追加 `-IPv6`。
 如果 Clash Verge 或浏览器无法导入 IPv6 字面量订阅地址，有 IPv4 时直接用 IPv4 订阅地址即可，它会返回同一份完整节点。
@@ -311,6 +337,7 @@ sudo cat /root/reality-relay-bootstrap-clash.yaml
 
 - 443 节点使用 `SERVER_ALIAS`，例如 `my-vps`
 - 每个 CSV 行一个节点，直接使用该行 `tag`，例如 `home-01`
+- 启用自有域名时，所有节点的 `server` 使用 `CUSTOM_DOMAIN`，不再额外生成 IPv6 字面量节点
 
 Mihomo/Clash 节点字段为：
 
@@ -341,10 +368,11 @@ alpn:
 SSH:        tcp/$SSH_PORT
 VLESS:      tcp/$DIRECT_PORT
 VLESS:      tcp/CSV 中每个 listen_port
-订阅:       tcp/$SUBSCRIPTION_PORT（仅 ENABLE_SUBSCRIPTION_SERVER=true）
+订阅:       tcp/$SUBSCRIPTION_PORT（仅 ENABLE_SUBSCRIPTION_SERVER=true 且未启用自有域名）
 ```
 
 服务商安全组/云防火墙也必须手动放行同样端口。
+启用自有域名时，`SUBSCRIPTION_PORT` 只在本机监听并由 Nginx fallback 反代，公网安全组只需要放行 SSH 和实际 VLESS 端口。
 
 ## 验证
 

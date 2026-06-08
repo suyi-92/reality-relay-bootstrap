@@ -132,6 +132,7 @@ def main() -> int:
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--ipv4", choices=["true", "false"], default="true")
     parser.add_argument("--ipv6", choices=["true", "false"], default="false")
+    parser.add_argument("--bind", choices=["public", "localhost"], default="public")
     parser.add_argument("--token-file", type=Path, required=True)
     parser.add_argument("--default-target", default="ClashMeta")
     args = parser.parse_args()
@@ -142,10 +143,12 @@ def main() -> int:
 
     handler = build_handler(args.root, args.token_file, default_target)
     servers: List[Tuple[str, ThreadingHTTPServer]] = []
+    ipv4_host = "127.0.0.1" if args.bind == "localhost" else "0.0.0.0"
+    ipv6_host = "::1" if args.bind == "localhost" else "::"
     if args.ipv4 == "true":
-        servers.append(("ipv4", ReusableHTTPServer(("0.0.0.0", args.port), handler)))
+        servers.append(("ipv4", ReusableHTTPServer((ipv4_host, args.port), handler)))
     if args.ipv6 == "true":
-        servers.append(("ipv6", IPv6HTTPServer(("::", args.port), handler)))
+        servers.append(("ipv6", IPv6HTTPServer((ipv6_host, args.port), handler)))
     if not servers:
         raise SystemExit("at least one of --ipv4 or --ipv6 must be true")
 

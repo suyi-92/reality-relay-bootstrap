@@ -51,7 +51,9 @@ else
     --skip-node-files
     --quiet
   )
-  if [[ -n "$SERVER_IP_IPV4" && -n "$SERVER_IP_IPV6" ]]; then
+  if custom_domain_enabled; then
+    args+=(--clash-ipv6 auto)
+  elif [[ -n "$SERVER_IP_IPV4" && -n "$SERVER_IP_IPV6" ]]; then
     args+=(
       --server-override "$SERVER_IP_IPV4"
       --extra-server "$SERVER_IP_IPV6"
@@ -72,6 +74,14 @@ fi
 if is_dry_run; then
   log "DRY-RUN: write $SERVICE_FILE and systemctl enable --now $SERVICE_NAME"
 else
+  bind_mode="public"
+  sub_ipv4="$([[ -n "$SERVER_IP_IPV4" ]] && echo true || echo false)"
+  sub_ipv6="$([[ -n "$SERVER_IP_IPV6" ]] && echo true || echo false)"
+  custom_domain_enabled && bind_mode="localhost"
+  if custom_domain_enabled; then
+    sub_ipv4="true"
+    sub_ipv6="false"
+  fi
   cat >"$SERVICE_FILE" <<EOF_SERVICE
 [Unit]
 Description=Reality Relay Bootstrap subscription file server
@@ -81,7 +91,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=$SUBSCRIPTION_DIR
-ExecStart=/usr/bin/python3 $SERVER_INSTALL_PATH --root $SUBSCRIPTION_DIR --port $SUBSCRIPTION_PORT --ipv4 $([[ -n "$SERVER_IP_IPV4" ]] && echo true || echo false) --ipv6 $([[ -n "$SERVER_IP_IPV6" ]] && echo true || echo false) --token-file $VLESS_UUID_PATH --default-target $SUBSCRIPTION_TARGET
+ExecStart=/usr/bin/python3 $SERVER_INSTALL_PATH --root $SUBSCRIPTION_DIR --port $SUBSCRIPTION_PORT --ipv4 $sub_ipv4 --ipv6 $sub_ipv6 --bind $bind_mode --token-file $VLESS_UUID_PATH --default-target $SUBSCRIPTION_TARGET
 Restart=on-failure
 RestartSec=3
 
@@ -120,9 +130,13 @@ $(if [[ -z "${SUBSCRIPTION_BASE_URL:-}" && -n "$(server_ipv6_hosts)" ]]; then
   done
 fi)
 
-说明：订阅内容按 SERVER_IP_IPV4/SERVER_IP_IPV6 生成；如果两者都填写，IPv4/IPv6 链接都返回同一份完整节点，IPv6 节点名称追加 -IPv6。
-如客户端无法导入 IPv6 字面量订阅地址，有 IPv4 时直接使用 IPv4 订阅地址即可。
-内置订阅服务是 HTTP；如需 HTTPS，请在外层接入带证书的反向代理。
-
-请确认 UFW 和服务商安全组放行 tcp/$SUBSCRIPTION_PORT。
+$(if custom_domain_enabled; then
+  printf '说明：订阅内容按 CUSTOM_DOMAIN 生成；HTTPS 订阅经 sing-box Reality fallback 转到本机 Nginx，再反代到内置订阅服务。\n'
+  printf '公网只需要放行 tcp/443；如不需要直接 HTTP 订阅，可在服务商安全组中不放行 tcp/%s。\n' "$SUBSCRIPTION_PORT"
+else
+  printf '说明：订阅内容按 SERVER_IP_IPV4/SERVER_IP_IPV6 生成；如果两者都填写，IPv4/IPv6 链接都返回同一份完整节点，IPv6 节点名称追加 -IPv6。\n'
+  printf '如客户端无法导入 IPv6 字面量订阅地址，有 IPv4 时直接使用 IPv4 订阅地址即可。\n'
+  printf '内置订阅服务是 HTTP；如需 HTTPS，请在外层接入带证书的反向代理。\n\n'
+  printf '请确认 UFW 和服务商安全组放行 tcp/%s。\n' "$SUBSCRIPTION_PORT"
+fi)
 EOF

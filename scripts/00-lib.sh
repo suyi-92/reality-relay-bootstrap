@@ -162,6 +162,18 @@ load_config() {
   : "${UPSTREAM_NODES_PATH:=./upstream-nodes.txt}"
   : "${RRB_STATE_DIR:=/etc/reality-relay-bootstrap}"
   export RRB_STATE_DIR
+  : "${ENABLE_CUSTOM_DOMAIN:=false}"
+  : "${CUSTOM_DOMAIN:=}"
+  : "${CUSTOM_DOMAIN_PROVIDER:=cloudflare}"
+  : "${LE_EMAIL:=}"
+  : "${LE_STAGING:=false}"
+  : "${CLOUDFLARE_API_TOKEN:=}"
+  : "${CLOUDFLARE_API_TOKEN_FILE:=$RRB_STATE_DIR/cloudflare.ini}"
+  : "${CLOUDFLARE_DNS_PROPAGATION_SECONDS:=60}"
+  : "${NGINX_FALLBACK_HOST:=127.0.0.1}"
+  : "${NGINX_FALLBACK_PORT:=8443}"
+  : "${NGINX_FALLBACK_ROOT:=/var/www/reality-relay-bootstrap}"
+  : "${NGINX_FALLBACK_CONF:=/etc/nginx/sites-available/reality-relay-bootstrap.conf}"
   : "${SINGBOX_CONFIG_PATH:=/etc/sing-box/config.json}"
   : "${VLESS_UUID_PATH:=$RRB_STATE_DIR/vless-uuid.txt}"
   : "${VLESS_FLOW:=xtls-rprx-vision}"
@@ -175,6 +187,7 @@ load_config() {
     [[ "$REALITY_PRIVATE_KEY_PATH" == "$DEFAULT_RRB_STATE_DIR/reality-private.key" ]] && REALITY_PRIVATE_KEY_PATH="$RRB_STATE_DIR/reality-private.key"
     [[ "$REALITY_PUBLIC_KEY_PATH" == "$DEFAULT_RRB_STATE_DIR/reality-public.key" ]] && REALITY_PUBLIC_KEY_PATH="$RRB_STATE_DIR/reality-public.key"
     [[ "$REALITY_SHORT_ID_PATH" == "$DEFAULT_RRB_STATE_DIR/reality-short-id.txt" ]] && REALITY_SHORT_ID_PATH="$RRB_STATE_DIR/reality-short-id.txt"
+    [[ "$CLOUDFLARE_API_TOKEN_FILE" == "$DEFAULT_RRB_STATE_DIR/cloudflare.ini" ]] && CLOUDFLARE_API_TOKEN_FILE="$RRB_STATE_DIR/cloudflare.ini"
   fi
 
   : "${REALITY_SERVER_NAME:=www.microsoft.com}"
@@ -199,9 +212,32 @@ load_config() {
   fi
   warn_legacy_subscription_target "$raw_subscription_target"
 
+  apply_custom_domain_defaults
   validate_config_basics
   resolve_csv_path
   resolve_upstream_nodes_path
+}
+
+custom_domain_enabled() {
+  [[ "${ENABLE_CUSTOM_DOMAIN:-false}" == "true" ]]
+}
+
+apply_custom_domain_defaults() {
+  custom_domain_enabled || return 0
+  [[ -n "${CUSTOM_DOMAIN:-}" ]] || return 0
+
+  if [[ -z "${REALITY_SERVER_NAME:-}" || "$REALITY_SERVER_NAME" == "www.microsoft.com" ]]; then
+    REALITY_SERVER_NAME="$CUSTOM_DOMAIN"
+  fi
+  if [[ -z "${REALITY_HANDSHAKE_SERVER:-}" || "$REALITY_HANDSHAKE_SERVER" == "www.microsoft.com" ]]; then
+    REALITY_HANDSHAKE_SERVER="$NGINX_FALLBACK_HOST"
+  fi
+  if [[ -z "${REALITY_HANDSHAKE_PORT:-}" || "$REALITY_HANDSHAKE_PORT" == "443" ]]; then
+    REALITY_HANDSHAKE_PORT="$NGINX_FALLBACK_PORT"
+  fi
+  if [[ "$ENABLE_SUBSCRIPTION_SERVER" == "true" && -z "${SUBSCRIPTION_BASE_URL:-}" ]]; then
+    SUBSCRIPTION_BASE_URL="https://$CUSTOM_DOMAIN"
+  fi
 }
 
 server_ipv4_hosts() {
@@ -291,6 +327,11 @@ validate_port() {
   (( value >= 1 && value <= 65535 )) || die "$name 超出端口范围 1-65535：$value"
 }
 
+validate_nonnegative_int() {
+  local name="$1" value="${!1}"
+  [[ "$value" =~ ^[0-9]+$ ]] || die "$name 必须是非负整数，当前：$value"
+}
+
 validate_user_name() {
   local name="$1" value="${!1}"
   [[ "$value" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || die "$name 用户名不合法：$value"
@@ -306,10 +347,14 @@ validate_config_basics() {
   validate_bool ENABLE_UFW
   validate_bool ENABLE_FAIL2BAN
   validate_bool ENABLE_IPV6_LISTEN
+  validate_bool ENABLE_CUSTOM_DOMAIN
+  validate_bool LE_STAGING
   validate_bool REJECT_CN_PRIVATE
   validate_bool CLIENT_UDP
   validate_bool ENABLE_SUBSCRIPTION_SERVER
   validate_bool RESET_PROXY_KEYS
+  validate_port NGINX_FALLBACK_PORT
+  validate_nonnegative_int CLOUDFLARE_DNS_PROPAGATION_SECONDS
   validate_user_name ADMIN_USER
   validate_user_name SFTP_USER
   normalize_subscription_target "$SUBSCRIPTION_TARGET" >/dev/null || die "SUBSCRIPTION_TARGET 不支持：$SUBSCRIPTION_TARGET"
@@ -328,6 +373,22 @@ validate_config_basics() {
   [[ "$SUBSCRIPTION_DIR" == /* ]] || die "SUBSCRIPTION_DIR 必须是绝对路径"
   [[ "$SUBSCRIPTION_DIR" =~ ^/[A-Za-z0-9._/-]+$ ]] || die "SUBSCRIPTION_DIR 只能包含英文、数字、点、下划线、短横线和斜杠"
   [[ -z "$SUBSCRIPTION_BASE_URL" || "$SUBSCRIPTION_BASE_URL" =~ ^https?://[^[:space:]]+$ ]] || die "SUBSCRIPTION_BASE_URL 必须以 http:// 或 https:// 开头"
+  [[ "$CUSTOM_DOMAIN_PROVIDER" == "cloudflare" ]] || die "CUSTOM_DOMAIN_PROVIDER 当前只支持 cloudflare"
+  [[ "$CLOUDFLARE_API_TOKEN_FILE" == /* ]] || die "CLOUDFLARE_API_TOKEN_FILE 必须是绝对路径"
+  [[ "$NGINX_FALLBACK_ROOT" == /* ]] || die "NGINX_FALLBACK_ROOT 必须是绝对路径"
+  [[ "$NGINX_FALLBACK_CONF" == /* ]] || die "NGINX_FALLBACK_CONF 必须是绝对路径"
+  if custom_domain_enabled; then
+    [[ -n "$CUSTOM_DOMAIN" ]] || die "ENABLE_CUSTOM_DOMAIN=true 时 CUSTOM_DOMAIN 不能为空"
+    [[ "$CUSTOM_DOMAIN" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$ && "$CUSTOM_DOMAIN" == *.* && "$CUSTOM_DOMAIN" != *..* ]] || die "CUSTOM_DOMAIN 不合法：$CUSTOM_DOMAIN"
+    [[ "$LE_EMAIL" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]] || die "ENABLE_CUSTOM_DOMAIN=true 时 LE_EMAIL 必须是有效邮箱"
+    [[ "$DIRECT_PORT" == "443" ]] || die "ENABLE_CUSTOM_DOMAIN=true 要求 DIRECT_PORT=443（公网 443 由 sing-box 接管）"
+    [[ "$NGINX_FALLBACK_PORT" != "$DIRECT_PORT" ]] || die "NGINX_FALLBACK_PORT 不能与 DIRECT_PORT 相同"
+    [[ "$NGINX_FALLBACK_PORT" != "$SSH_PORT" ]] || die "NGINX_FALLBACK_PORT 不能与 SSH_PORT 相同"
+    [[ "$NGINX_FALLBACK_PORT" != "$SUBSCRIPTION_PORT" ]] || die "NGINX_FALLBACK_PORT 不能与 SUBSCRIPTION_PORT 相同"
+    [[ "$REALITY_SERVER_NAME" == "$CUSTOM_DOMAIN" ]] || die "启用自有域名时 REALITY_SERVER_NAME 必须等于 CUSTOM_DOMAIN"
+    [[ "$REALITY_HANDSHAKE_SERVER" == "$NGINX_FALLBACK_HOST" ]] || die "启用自有域名时 REALITY_HANDSHAKE_SERVER 必须等于 NGINX_FALLBACK_HOST"
+    [[ "$REALITY_HANDSHAKE_PORT" == "$NGINX_FALLBACK_PORT" ]] || die "启用自有域名时 REALITY_HANDSHAKE_PORT 必须等于 NGINX_FALLBACK_PORT"
+  fi
   [[ "$VLESS_FLOW" == "" || "$VLESS_FLOW" == "xtls-rprx-vision" ]] || die "VLESS_FLOW 目前建议为空或 xtls-rprx-vision，当前：$VLESS_FLOW"
   [[ "$REALITY_SERVER_NAME" =~ ^[A-Za-z0-9._-]+$ ]] || die "REALITY_SERVER_NAME 不合法：$REALITY_SERVER_NAME"
   [[ "$REALITY_HANDSHAKE_SERVER" =~ ^[A-Za-z0-9._-]+$ ]] || die "REALITY_HANDSHAKE_SERVER 不合法：$REALITY_HANDSHAKE_SERVER"

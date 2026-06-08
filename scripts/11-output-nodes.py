@@ -56,6 +56,8 @@ def normalize_subscription_target(value: str) -> str:
 
 
 def get_server_ip(env: Dict[str, str], server_override: str = "") -> str:
+    if env.get("ENABLE_CUSTOM_DOMAIN", "false").lower() == "true" and env.get("CUSTOM_DOMAIN", "").strip():
+        return env["CUSTOM_DOMAIN"].strip()
     if server_override.strip():
         return server_override.strip()
     if env.get("SERVER_IP", "").strip():

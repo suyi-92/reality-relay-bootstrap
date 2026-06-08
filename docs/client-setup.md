@@ -17,6 +17,19 @@ http://服务器IP:51040/sub/<VLESS_UUID>?target=ClashMeta
 
 `<VLESS_UUID>` 来自 `/etc/reality-relay-bootstrap/vless-uuid.txt`。内置订阅服务是 HTTP；如需 HTTPS，请在外层接入带证书的反向代理，并把 `SUBSCRIPTION_BASE_URL` 设置为反代外部地址。
 
+如果启用了自有域名：
+
+```bash
+ENABLE_CUSTOM_DOMAIN="true"
+CUSTOM_DOMAIN="edge.example.com"
+```
+
+节点和订阅内容里的 `server` 会使用 `CUSTOM_DOMAIN`，Reality `servername` 也会使用该域名。订阅服务只监听本机，外部订阅地址为：
+
+```text
+https://edge.example.com/sub/<VLESS_UUID>?target=ClashMeta
+```
+
 如需在服务器本地额外生成节点文件：
 
 ```bash
@@ -61,6 +74,7 @@ alpn:
 
 - `MODE_443=direct`：使用 `SERVER_ALIAS`
 - `MODE_443=smart`：使用 `SERVER_ALIAS`
+- 启用自有域名时：节点 server 使用 `CUSTOM_DOMAIN`
 
 CSV 行节点：
 

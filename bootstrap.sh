@@ -24,6 +24,7 @@ Phases:
   fail2ban        安装并配置 fail2ban
   singbox         安装 sing-box、生成 VLESS+Reality 多入口配置并重启
   subscription    安装/更新可选订阅端口
+  custom-domain   可选配置 Cloudflare DNS-01 证书和本机 Nginx fallback
   firewall        安装/配置 UFW，只开放 SSH、443 和实际中转端口
   validate        验证 SSH、fail2ban、UFW、sing-box、监听端口、家宽代理和上游节点
   output-nodes    可选生成 /root/reality-relay-bootstrap-nodes.txt 与 /root/reality-relay-bootstrap-clash.yaml
@@ -64,11 +65,13 @@ case "$PHASE" in
     python3 "$SCRIPT_DIR/08-generate-singbox-config.py" --config-env "$RRB_CONFIG_FILE" --write --quiet
     run_phase 10-validate.sh --singbox-only --skip-proxy-tests --restart-singbox
     run_phase 13-setup-subscription.sh
+    run_phase 14-setup-custom-domain.sh
     ;;
   firewall) run_phase 09-apply-firewall.sh ;;
   validate) run_phase 10-validate.sh ;;
   output-nodes) run_phase 11-output-nodes-wrapper.sh ;;
   subscription) run_phase 13-setup-subscription.sh ;;
+  custom-domain) run_phase 14-setup-custom-domain.sh ;;
   rollback) run_phase 12-rollback.sh ;;
   *) echo "Unknown phase: $PHASE" >&2; usage >&2; exit 2 ;;
 esac

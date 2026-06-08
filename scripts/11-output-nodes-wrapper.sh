@@ -18,7 +18,9 @@ args=(
   --nodes-out /root/reality-relay-bootstrap-nodes.txt
   --clash-out /root/reality-relay-bootstrap-clash.yaml
 )
-if [[ -n "$SERVER_IP_IPV4" && -n "$SERVER_IP_IPV6" ]]; then
+if custom_domain_enabled; then
+  args+=(--clash-ipv6 auto)
+elif [[ -n "$SERVER_IP_IPV4" && -n "$SERVER_IP_IPV6" ]]; then
   args+=(--server-override "$SERVER_IP_IPV4" --extra-server "$SERVER_IP_IPV6" --extra-name-suffix=-IPv6 --clash-ipv6 true)
 elif [[ -n "$SERVER_IP_IPV4" ]]; then
   args+=(--server-override "$SERVER_IP_IPV4" --clash-ipv6 false)

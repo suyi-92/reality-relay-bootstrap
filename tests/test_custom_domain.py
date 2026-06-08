@@ -1,0 +1,73 @@
+from __future__ import annotations
+
+import importlib.util
+import unittest
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def load_module(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+gen = load_module("gen", ROOT / "scripts" / "08-generate-singbox-config.py")
+nodes = load_module("nodes", ROOT / "scripts" / "11-output-nodes.py")
+
+
+class CustomDomainConfigTest(unittest.TestCase):
+    def custom_domain_env(self, **overrides: str):
+        env = {
+            "SERVER_ALIAS": "edge",
+            "SERVER_IP_IPV4": "203.0.113.10",
+            "ENABLE_CUSTOM_DOMAIN": "true",
+            "CUSTOM_DOMAIN": "edge.example.com",
+            "LE_EMAIL": "admin@example.com",
+        }
+        env.update(overrides)
+        return gen.defaults(env)
+
+    def test_custom_domain_defaults_reality_fallback_to_local_nginx(self):
+        env = self.custom_domain_env()
+
+        gen.validate_env(env)
+
+        self.assertEqual(env["REALITY_SERVER_NAME"], "edge.example.com")
+        self.assertEqual(env["REALITY_HANDSHAKE_SERVER"], "127.0.0.1")
+        self.assertEqual(env["REALITY_HANDSHAKE_PORT"], "8443")
+        self.assertEqual(env["SUBSCRIPTION_BASE_URL"], "https://edge.example.com")
+
+    def test_custom_domain_requires_public_443_for_singbox(self):
+        env = self.custom_domain_env(DIRECT_PORT="444")
+
+        with self.assertRaises(SystemExit):
+            gen.validate_env(env)
+
+    def test_reality_inbound_uses_custom_domain_and_local_handshake(self):
+        env = self.custom_domain_env()
+        inbound = gen.build_vless_reality_inbound(
+            "vless-direct-443",
+            443,
+            "11111111-1111-1111-1111-111111111111",
+            "private-key",
+            "aabbccdd",
+            env,
+        )
+
+        self.assertEqual(inbound["tls"]["server_name"], "edge.example.com")
+        self.assertEqual(inbound["tls"]["reality"]["handshake"]["server"], "127.0.0.1")
+        self.assertEqual(inbound["tls"]["reality"]["handshake"]["server_port"], 8443)
+
+    def test_node_output_prefers_custom_domain_over_ip_overrides(self):
+        env = self.custom_domain_env()
+
+        self.assertEqual(nodes.get_server_ip(env, "203.0.113.10"), "edge.example.com")
+
+
+if __name__ == "__main__":
+    unittest.main()

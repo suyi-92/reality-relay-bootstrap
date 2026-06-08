@@ -111,6 +111,19 @@ if [[ "$ENABLE_SUBSCRIPTION_SERVER" == "true" && "$SINGBOX_ONLY" != "true" ]]; t
   fi
 fi
 
+if custom_domain_enabled && [[ "$SINGBOX_ONLY" != "true" ]]; then
+  if is_dry_run; then
+    info "DRY-RUN: 实际运行后应检查 Nginx fallback：$NGINX_FALLBACK_HOST:$NGINX_FALLBACK_PORT"
+  else
+    info "检查自有域名 Nginx fallback。"
+    systemctl is-active --quiet nginx || die "Nginx 未运行"
+    wait_for_port_listener "$NGINX_FALLBACK_PORT" 15 || die "Nginx fallback 未监听端口：$NGINX_FALLBACK_PORT"
+    timeout 10 openssl s_client -brief -connect "$NGINX_FALLBACK_HOST:$NGINX_FALLBACK_PORT" -servername "$CUSTOM_DOMAIN" </dev/null >>"$LOG_FILE" 2>&1 \
+      || die "Nginx fallback TLS 验证失败：$NGINX_FALLBACK_HOST:$NGINX_FALLBACK_PORT"
+    info "Nginx fallback 正常：$NGINX_FALLBACK_HOST:$NGINX_FALLBACK_PORT"
+  fi
+fi
+
 if [[ "$SKIP_PROXY_TESTS" != "true" ]]; then
   info "测试每个家宽代理和上游节点是否可用；不会把代理密码或节点密钥写入日志。"
   if ! is_dry_run; then
