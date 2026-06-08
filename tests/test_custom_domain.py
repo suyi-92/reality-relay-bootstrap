@@ -41,7 +41,18 @@ class CustomDomainConfigTest(unittest.TestCase):
         self.assertEqual(env["REALITY_SERVER_NAME"], "edge.example.com")
         self.assertEqual(env["REALITY_HANDSHAKE_SERVER"], "127.0.0.1")
         self.assertEqual(env["REALITY_HANDSHAKE_PORT"], "8443")
+        self.assertEqual(env["NGINX_FALLBACK_ROOT"], "/var/www/reality-fallback")
         self.assertEqual(env["SUBSCRIPTION_BASE_URL"], "https://edge.example.com")
+
+    def test_fallback_site_writes_static_page_assets(self):
+        script = (ROOT / "scripts" / "15-setup-custom-domain.sh").read_text(encoding="utf-8")
+
+        self.assertIn("<title>Digital Notes</title>", script)
+        self.assertIn("This site hosts lightweight static pages and public notes.", script)
+        self.assertIn("$NGINX_FALLBACK_ROOT/robots.txt", script)
+        self.assertIn("$NGINX_FALLBACK_ROOT/favicon.ico", script)
+        self.assertIn("curl --noproxy '*' -fsS --resolve", script)
+        self.assertIn("$base_url/healthz", script)
 
     def test_custom_domain_requires_public_443_for_singbox(self):
         env = self.custom_domain_env(DIRECT_PORT="444")

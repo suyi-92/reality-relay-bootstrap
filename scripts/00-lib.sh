@@ -179,7 +179,7 @@ load_config() {
   : "${CLOUDFLARE_DNS_PROPAGATION_SECONDS:=60}"
   : "${NGINX_FALLBACK_HOST:=127.0.0.1}"
   : "${NGINX_FALLBACK_PORT:=8443}"
-  : "${NGINX_FALLBACK_ROOT:=/var/www/reality-relay-bootstrap}"
+  : "${NGINX_FALLBACK_ROOT:=/var/www/reality-fallback}"
   : "${NGINX_FALLBACK_CONF:=/etc/nginx/sites-available/reality-relay-bootstrap.conf}"
   : "${SINGBOX_CONFIG_PATH:=/etc/sing-box/config.json}"
   : "${VLESS_UUID_PATH:=$RRB_STATE_DIR/vless-uuid.txt}"

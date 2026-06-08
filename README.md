@@ -186,6 +186,7 @@ Cloudflare 侧分两类：
 
 - 公网 `tcp/443` 仍由 sing-box VLESS+Reality 监听。
 - 普通 HTTPS/TLS fallback 到本机 `127.0.0.1:8443` 的 Nginx。
+- Nginx 默认站点根目录是 `/var/www/reality-fallback`，脚本会写入一个 `Digital Notes` 静态首页、`robots.txt` 和空 `favicon.ico`。
 - 证书通过 certbot `dns-cloudflare` 插件使用 Cloudflare DNS-01 申请 Let’s Encrypt。
 - 节点输出里的 `server` 和 `servername` 会使用 `CUSTOM_DOMAIN`。
 - 如果启用订阅服务，订阅 URL 默认为 `https://CUSTOM_DOMAIN/sub/<VLESS_UUID>?target=ClashMeta`，订阅服务只绑定本机并由 Nginx 反代。

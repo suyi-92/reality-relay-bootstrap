@@ -61,23 +61,55 @@ request_certificate() {
   run certbot "${certbot_args[@]}"
 }
 
-write_fallback_index() {
+write_fallback_site() {
   run mkdir -p "$NGINX_FALLBACK_ROOT"
-  write_root_file "$NGINX_FALLBACK_ROOT/index.html" 0644 <<EOF
+  write_root_file "$NGINX_FALLBACK_ROOT/index.html" 0644 <<'EOF'
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>$CUSTOM_DOMAIN</title>
+  <title>Digital Notes</title>
+  <style>
+    body {
+      max-width: 760px;
+      margin: 60px auto;
+      padding: 0 20px;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.6;
+      color: #222;
+    }
+
+    h1 {
+      font-size: 32px;
+    }
+
+    .muted {
+      color: #666;
+    }
+  </style>
 </head>
 <body>
   <main>
-    <h1>$CUSTOM_DOMAIN</h1>
-    <p>Service online.</p>
+    <h1>Digital Notes</h1>
+    <p class="muted">A small collection of technical notes, references, and project updates.</p>
+
+    <h2>About</h2>
+    <p>This site hosts lightweight static pages and public notes.</p>
+
+    <h2>Status</h2>
+    <p>All services are running normally.</p>
   </main>
 </body>
 </html>
+EOF
+
+  write_root_file "$NGINX_FALLBACK_ROOT/robots.txt" 0644 <<'EOF'
+User-agent: *
+Allow: /
+EOF
+
+  write_root_file "$NGINX_FALLBACK_ROOT/favicon.ico" 0644 <<'EOF'
 EOF
 }
 
@@ -163,18 +195,34 @@ reload_nginx() {
 }
 
 verify_fallback() {
+  local resolve_arg base_url body robots health
   if is_dry_run; then
     log "DRY-RUN: verify local Nginx fallback TLS on $NGINX_FALLBACK_HOST:$NGINX_FALLBACK_PORT"
+    log "DRY-RUN: verify fallback site content through https://$CUSTOM_DOMAIN:$NGINX_FALLBACK_PORT/"
     return 0
   fi
   wait_for_port_listener "$NGINX_FALLBACK_PORT" 15 || die "Nginx fallback 未监听端口：$NGINX_FALLBACK_PORT"
   timeout 10 openssl s_client -brief -connect "$NGINX_FALLBACK_HOST:$NGINX_FALLBACK_PORT" -servername "$CUSTOM_DOMAIN" </dev/null >>"$LOG_FILE" 2>&1 \
     || die "本机 Nginx fallback TLS 验证失败：$NGINX_FALLBACK_HOST:$NGINX_FALLBACK_PORT"
+
+  resolve_arg="$CUSTOM_DOMAIN:$NGINX_FALLBACK_PORT:$NGINX_FALLBACK_HOST"
+  base_url="https://$CUSTOM_DOMAIN:$NGINX_FALLBACK_PORT"
+
+  body="$(timeout 10 curl --noproxy '*' -fsS --resolve "$resolve_arg" "$base_url/" 2>>"$LOG_FILE" || true)"
+  [[ "$body" == *"<title>Digital Notes</title>"* ]] || die "Nginx fallback 首页内容验证失败：$base_url/"
+
+  robots="$(timeout 10 curl --noproxy '*' -fsS --resolve "$resolve_arg" "$base_url/robots.txt" 2>>"$LOG_FILE" || true)"
+  [[ "$robots" == *"User-agent: *"* && "$robots" == *"Allow: /"* ]] || die "Nginx fallback robots.txt 验证失败：$base_url/robots.txt"
+
+  health="$(timeout 10 curl --noproxy '*' -fsS --resolve "$resolve_arg" "$base_url/healthz" 2>>"$LOG_FILE" || true)"
+  [[ "$health" == "ok" ]] || die "Nginx fallback healthz 验证失败：$base_url/healthz"
+
+  info "Nginx fallback 静态站点正常：$base_url/"
 }
 
 ensure_cloudflare_credentials
 request_certificate
-write_fallback_index
+write_fallback_site
 write_nginx_site
 write_renew_hook
 reload_nginx

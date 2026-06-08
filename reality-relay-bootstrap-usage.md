@@ -511,7 +511,7 @@ CLOUDFLARE_API_TOKEN="Cloudflare DNS API Token"
 NGINX_FALLBACK_PORT="8443"
 ```
 
-Cloudflare 侧需要先在控制台添加/托管 zone，并到域名注册商把 NS 改成 Cloudflare 分配的 nameserver。脚本默认会用 API token 创建或更新 `CUSTOM_DOMAIN` 的 A/AAAA 记录，`proxied=false`，也就是灰云 / DNS only。公网 `443` 继续由 sing-box 监听，普通 TLS fallback 到本机 Nginx `127.0.0.1:8443`；`REALITY_SERVER_NAME` 会自动回填为 `CUSTOM_DOMAIN`，`REALITY_HANDSHAKE_SERVER` 会回填为 `127.0.0.1`，`REALITY_HANDSHAKE_PORT` 会回填为 `NGINX_FALLBACK_PORT`。订阅服务启用时只绑定本机，并通过 `https://CUSTOM_DOMAIN/sub/<VLESS_UUID>?target=ClashMeta` 对外访问。
+Cloudflare 侧需要先在控制台添加/托管 zone，并到域名注册商把 NS 改成 Cloudflare 分配的 nameserver。脚本默认会用 API token 创建或更新 `CUSTOM_DOMAIN` 的 A/AAAA 记录，`proxied=false`，也就是灰云 / DNS only。公网 `443` 继续由 sing-box 监听，普通 TLS fallback 到本机 Nginx `127.0.0.1:8443`；Nginx 默认站点根目录是 `/var/www/reality-fallback`，会写入 `Digital Notes` 静态首页、`robots.txt` 和空 `favicon.ico`。`REALITY_SERVER_NAME` 会自动回填为 `CUSTOM_DOMAIN`，`REALITY_HANDSHAKE_SERVER` 会回填为 `127.0.0.1`，`REALITY_HANDSHAKE_PORT` 会回填为 `NGINX_FALLBACK_PORT`。订阅服务启用时只绑定本机，并通过 `https://CUSTOM_DOMAIN/sub/<VLESS_UUID>?target=ClashMeta` 对外访问。
 
 ### 5.7 客户端输出变量
 
