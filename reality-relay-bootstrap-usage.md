@@ -88,7 +88,8 @@ sudo bash install.sh
 | `CLOUDFLARE_API_TOKEN` | 空 | Cloudflare DNS API Token；用于 DNS-01 申请证书 |
 | `RESET_PROXY_KEYS` | `false` | 是否重置 VLESS UUID、Reality keypair 和 short-id |
 | `ENABLE_SUBSCRIPTION_SERVER` | `true` | 是否开启简单订阅端口 |
-| `SUBSCRIPTION_PORT` | `51040` | 订阅端口；仅开启订阅服务时询问 |
+| `SUBSCRIPTION_PORT` | 自有域名时默认空；非自有域名默认 `51040` | 可选公网直连订阅端口；自有域名留空时只显示域名订阅 |
+| `SUBSCRIPTION_INTERNAL_PORT` | `51040` | 订阅服务本机监听端口，供 Nginx fallback 反代 |
 | `SUBSCRIPTION_TARGET` | `ClashMeta` | 当前只生成 ClashMeta/Mihomo YAML |
 | `HOME_PORT_START` | `51043` | 出口入口端口自动分配起点 |
 | `ADMIN_PUBKEY` | 空回车结束 | 本地 SSH 公钥，可填写多个 |
@@ -818,11 +819,11 @@ SSH_PORT
 DIRECT_PORT
 home-proxies.csv 里的每个 listen_port
 upstream-nodes.txt 里的每个 listen_port
-SUBSCRIPTION_PORT（仅 ENABLE_SUBSCRIPTION_SERVER=true 且未启用自有域名）
+SUBSCRIPTION_PORT（仅 ENABLE_SUBSCRIPTION_SERVER=true 且公网直连订阅端口已启用）
 ```
 
 不会默认开放从 `51043` 起的整段端口范围。
-启用自有域名时，订阅服务只监听本机并由 Nginx fallback 反代，UFW 不开放 `SUBSCRIPTION_PORT`。
+启用自有域名且 `SUBSCRIPTION_PORT` 留空时，订阅服务只监听本机 `SUBSCRIPTION_INTERNAL_PORT` 并由 Nginx fallback 反代，UFW 不开放订阅端口。
 
 执行后查看：
 
@@ -882,10 +883,13 @@ sudo cat /root/reality-relay-bootstrap-clash.yaml
 
 ```bash
 ENABLE_SUBSCRIPTION_SERVER="true"
-SUBSCRIPTION_PORT="51040"
+SUBSCRIPTION_PORT=""
+SUBSCRIPTION_INTERNAL_PORT="51040"
 SUBSCRIPTION_TARGET="ClashMeta"
 SUBSCRIPTION_BASE_URL=""
 ```
+
+未启用自有域名时，`SUBSCRIPTION_PORT` 留空会自动回退为 `SUBSCRIPTION_INTERNAL_PORT`，也就是默认 `51040`。
 
 更新订阅服务：
 
@@ -906,7 +910,8 @@ http://服务器IP:51040/sub/<VLESS_UUID>?target=ClashMeta
 https://CUSTOM_DOMAIN/sub/<VLESS_UUID>?target=ClashMeta
 ```
 
-`<VLESS_UUID>` 来自 `/etc/reality-relay-bootstrap/vless-uuid.txt`。内置订阅服务是 HTTP；未启用自有域名时如需 HTTPS，请在外层接入带证书的反向代理，并把 `SUBSCRIPTION_BASE_URL` 设置为反代外部地址。启用自有域名时，订阅服务只监听本机，外部 HTTPS 由 sing-box Reality fallback 到 Nginx 后反代。
+`<VLESS_UUID>` 来自 `/etc/reality-relay-bootstrap/vless-uuid.txt`。内置订阅服务是 HTTP；未启用自有域名时如需 HTTPS，请在外层接入带证书的反向代理，并把 `SUBSCRIPTION_BASE_URL` 设置为反代外部地址。启用自有域名时，订阅服务默认只监听本机 `SUBSCRIPTION_INTERNAL_PORT`，外部 HTTPS 由 sing-box Reality fallback 到 Nginx 后反代。
+启用自有域名时，`SUBSCRIPTION_PORT` 默认留空；只有显式填写它时，才会额外开放并显示 `http://SERVER_IP:SUBSCRIPTION_PORT/sub/...` 直连订阅链接。
 
 `SUBSCRIPTION_TARGET` 当前只生成 ClashMeta/Mihomo YAML；旧配置里的其它 target 会警告并按 ClashMeta 处理，旧 URL target 不再兼容。
 

@@ -102,12 +102,12 @@ fi
 
 if [[ "$ENABLE_SUBSCRIPTION_SERVER" == "true" && "$SINGBOX_ONLY" != "true" ]]; then
   if is_dry_run; then
-    info "DRY-RUN: 实际运行后应检查订阅服务端口：$SUBSCRIPTION_PORT"
+    info "DRY-RUN: 实际运行后应检查订阅服务监听端口：$SUBSCRIPTION_LISTEN_PORT"
   else
     info "检查订阅服务。"
     systemctl is-active --quiet reality-relay-subscription || die "订阅服务未运行"
-    wait_for_port_listener "$SUBSCRIPTION_PORT" 15 || die "订阅服务未监听端口：$SUBSCRIPTION_PORT"
-    info "订阅服务端口正常：$SUBSCRIPTION_PORT"
+    wait_for_port_listener "$SUBSCRIPTION_LISTEN_PORT" 15 || die "订阅服务未监听端口：$SUBSCRIPTION_LISTEN_PORT"
+    info "订阅服务端口正常：$SUBSCRIPTION_LISTEN_PORT"
   fi
 fi
 

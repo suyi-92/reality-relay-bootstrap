@@ -4,10 +4,13 @@
 
 ```bash
 ENABLE_SUBSCRIPTION_SERVER="true"
-SUBSCRIPTION_PORT="51040"
+SUBSCRIPTION_PORT=""
+SUBSCRIPTION_INTERNAL_PORT="51040"
 SUBSCRIPTION_TARGET="ClashMeta"
 SUBSCRIPTION_BASE_URL=""
 ```
+
+未启用自有域名时，`SUBSCRIPTION_PORT` 留空会自动回退为 `SUBSCRIPTION_INTERNAL_PORT`，也就是默认 `51040`。
 
 订阅地址：
 
@@ -29,6 +32,8 @@ CUSTOM_DOMAIN="edge.example.com"
 ```text
 https://edge.example.com/sub/<VLESS_UUID>?target=ClashMeta
 ```
+
+自有域名模式下 `SUBSCRIPTION_PORT` 默认留空，只显示上面的域名 HTTPS 订阅。只有显式填写 `SUBSCRIPTION_PORT` 时，才会额外显示并开放 `http://SERVER_IP:SUBSCRIPTION_PORT/sub/...`。
 
 如需在服务器本地额外生成节点文件：
 

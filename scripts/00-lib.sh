@@ -208,7 +208,9 @@ load_config() {
   : "${CLIENT_ALPN:=h2,http/1.1}"
   : "${CLASH_MIXED_PORT:=7890}"
   : "${ENABLE_SUBSCRIPTION_SERVER:=true}"
-  : "${SUBSCRIPTION_PORT:=51040}"
+  : "${SUBSCRIPTION_PORT:=}"
+  : "${SUBSCRIPTION_INTERNAL_PORT:=51040}"
+  : "${SUBSCRIPTION_LISTEN_PORT:=}"
   : "${SUBSCRIPTION_DIR:=/etc/reality-relay-bootstrap/subscription}"
   : "${RESET_PROXY_KEYS:=false}"
   : "${SUBSCRIPTION_TARGET:=ClashMeta}"
@@ -220,6 +222,7 @@ load_config() {
   warn_legacy_subscription_target "$raw_subscription_target"
 
   apply_custom_domain_defaults
+  apply_subscription_defaults
   validate_config_basics
   resolve_csv_path
   resolve_upstream_nodes_path
@@ -248,6 +251,33 @@ apply_custom_domain_defaults() {
   if [[ -z "${CLOUDFLARE_ZONE_NAME:-}" ]]; then
     CLOUDFLARE_ZONE_NAME="$(infer_cloudflare_zone_name "$CUSTOM_DOMAIN")"
   fi
+}
+
+apply_subscription_defaults() {
+  if [[ "$ENABLE_SUBSCRIPTION_SERVER" != "true" ]]; then
+    return 0
+  fi
+
+  if custom_domain_enabled; then
+    if [[ -n "${SUBSCRIPTION_PORT:-}" ]]; then
+      SUBSCRIPTION_LISTEN_PORT="$SUBSCRIPTION_PORT"
+    else
+      SUBSCRIPTION_LISTEN_PORT="$SUBSCRIPTION_INTERNAL_PORT"
+    fi
+  else
+    if [[ -z "${SUBSCRIPTION_PORT:-}" ]]; then
+      SUBSCRIPTION_PORT="$SUBSCRIPTION_INTERNAL_PORT"
+    fi
+    SUBSCRIPTION_LISTEN_PORT="$SUBSCRIPTION_PORT"
+  fi
+}
+
+subscription_public_enabled() {
+  [[ "${ENABLE_SUBSCRIPTION_SERVER:-false}" == "true" ]] || return 1
+  if custom_domain_enabled && [[ -z "${SUBSCRIPTION_PORT:-}" ]]; then
+    return 1
+  fi
+  [[ -n "${SUBSCRIPTION_PORT:-}" ]]
 }
 
 infer_cloudflare_zone_name() {
@@ -390,11 +420,16 @@ validate_config_basics() {
   [[ "$PROXY_PROTOCOL" == "vless-reality" ]] || die "PROXY_PROTOCOL 当前只支持 vless-reality"
   [[ "$PROXY_IP_VERSION" == "ipv4" || "$PROXY_IP_VERSION" == "ipv6" || "$PROXY_IP_VERSION" == "dual" ]] || die "PROXY_IP_VERSION 只能是 ipv4、ipv6 或 dual"
   validate_port REALITY_HANDSHAKE_PORT
-  validate_port SUBSCRIPTION_PORT
+  validate_port SUBSCRIPTION_INTERNAL_PORT
   if [[ "$ENABLE_SUBSCRIPTION_SERVER" == "true" ]]; then
-    [[ "$SUBSCRIPTION_PORT" != "$SSH_PORT" ]] || die "SUBSCRIPTION_PORT 不能与 SSH_PORT 相同"
-    [[ "$SUBSCRIPTION_PORT" != "$DIRECT_PORT" ]] || die "SUBSCRIPTION_PORT 不能与 DIRECT_PORT 相同"
-    (( SUBSCRIPTION_PORT < HOME_PORT_START || SUBSCRIPTION_PORT > HOME_PORT_END )) || die "SUBSCRIPTION_PORT 不能落在 HOME_PORT_START/HOME_PORT_END 范围内"
+    [[ -n "$SUBSCRIPTION_LISTEN_PORT" ]] || die "SUBSCRIPTION_LISTEN_PORT 不能为空"
+    validate_port SUBSCRIPTION_LISTEN_PORT
+    if [[ -n "${SUBSCRIPTION_PORT:-}" ]]; then
+      validate_port SUBSCRIPTION_PORT
+    fi
+    [[ "$SUBSCRIPTION_LISTEN_PORT" != "$SSH_PORT" ]] || die "SUBSCRIPTION_LISTEN_PORT 不能与 SSH_PORT 相同"
+    [[ "$SUBSCRIPTION_LISTEN_PORT" != "$DIRECT_PORT" ]] || die "SUBSCRIPTION_LISTEN_PORT 不能与 DIRECT_PORT 相同"
+    (( SUBSCRIPTION_LISTEN_PORT < HOME_PORT_START || SUBSCRIPTION_LISTEN_PORT > HOME_PORT_END )) || die "SUBSCRIPTION_LISTEN_PORT 不能落在 HOME_PORT_START/HOME_PORT_END 范围内"
   fi
   [[ "$SUBSCRIPTION_DIR" == /* ]] || die "SUBSCRIPTION_DIR 必须是绝对路径"
   [[ "$SUBSCRIPTION_DIR" =~ ^/[A-Za-z0-9._/-]+$ ]] || die "SUBSCRIPTION_DIR 只能包含英文、数字、点、下划线、短横线和斜杠"
@@ -416,7 +451,7 @@ validate_config_basics() {
     [[ "$DIRECT_PORT" == "443" ]] || die "ENABLE_CUSTOM_DOMAIN=true 要求 DIRECT_PORT=443（公网 443 由 sing-box 接管）"
     [[ "$NGINX_FALLBACK_PORT" != "$DIRECT_PORT" ]] || die "NGINX_FALLBACK_PORT 不能与 DIRECT_PORT 相同"
     [[ "$NGINX_FALLBACK_PORT" != "$SSH_PORT" ]] || die "NGINX_FALLBACK_PORT 不能与 SSH_PORT 相同"
-    [[ "$NGINX_FALLBACK_PORT" != "$SUBSCRIPTION_PORT" ]] || die "NGINX_FALLBACK_PORT 不能与 SUBSCRIPTION_PORT 相同"
+    [[ "$NGINX_FALLBACK_PORT" != "$SUBSCRIPTION_LISTEN_PORT" ]] || die "NGINX_FALLBACK_PORT 不能与 SUBSCRIPTION_LISTEN_PORT 相同"
     [[ "$REALITY_SERVER_NAME" == "$CUSTOM_DOMAIN" ]] || die "启用自有域名时 REALITY_SERVER_NAME 必须等于 CUSTOM_DOMAIN"
     [[ "$REALITY_HANDSHAKE_SERVER" == "$NGINX_FALLBACK_HOST" ]] || die "启用自有域名时 REALITY_HANDSHAKE_SERVER 必须等于 NGINX_FALLBACK_HOST"
     [[ "$REALITY_HANDSHAKE_PORT" == "$NGINX_FALLBACK_PORT" ]] || die "启用自有域名时 REALITY_HANDSHAKE_PORT 必须等于 NGINX_FALLBACK_PORT"

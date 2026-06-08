@@ -123,7 +123,7 @@ write_nginx_site() {
     subscription_block="$(cat <<EOF
 
   location /sub/ {
-    proxy_pass http://127.0.0.1:$SUBSCRIPTION_PORT;
+    proxy_pass http://127.0.0.1:$SUBSCRIPTION_LISTEN_PORT;
     proxy_http_version 1.1;
     proxy_set_header Host \$host;
     proxy_set_header X-Real-IP \$remote_addr;

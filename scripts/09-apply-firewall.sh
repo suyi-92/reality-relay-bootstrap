@@ -27,7 +27,7 @@ cleanup_rrb_ufw_rules() {
   for port in "${PORTS[@]}"; do
     printf '%s/tcp\n' "$port" >>"$desired_file"
   done
-  if [[ "$ENABLE_SUBSCRIPTION_SERVER" == "true" ]] && ! custom_domain_enabled; then
+  if subscription_public_enabled; then
     printf '%s/tcp\n' "$SUBSCRIPTION_PORT" >>"$desired_file"
   fi
 
@@ -88,11 +88,11 @@ for port in "${PORTS[@]}"; do
   run ufw allow "${port}/tcp" comment "reality-relay-bootstrap sing-box VLESS+Reality ${port}"
 done
 
-if [[ "$ENABLE_SUBSCRIPTION_SERVER" == "true" ]] && ! custom_domain_enabled; then
+if subscription_public_enabled; then
   info "准备开放订阅 HTTP 端口：$SUBSCRIPTION_PORT"
   run ufw allow "${SUBSCRIPTION_PORT}/tcp" comment "reality-relay-bootstrap subscription ${SUBSCRIPTION_PORT}"
 elif [[ "$ENABLE_SUBSCRIPTION_SERVER" == "true" ]]; then
-  info "自有域名已启用，订阅服务仅本机监听并通过 443 fallback 反代，不开放 tcp/$SUBSCRIPTION_PORT。"
+  info "未设置公网订阅端口；订阅服务仅本机监听 tcp/$SUBSCRIPTION_LISTEN_PORT 并通过 443 fallback 反代。"
 fi
 
 if is_dry_run; then
@@ -112,7 +112,7 @@ UFW 已按最小端口开放。服务商安全组/云防火墙也必须手动放
 
   SSH:        tcp/$SSH_PORT
 $(printf '  VLESS+Reality:     tcp/%s\n' "${PORTS[@]}")
-$(if [[ "$ENABLE_SUBSCRIPTION_SERVER" == "true" && "$ENABLE_CUSTOM_DOMAIN" != "true" ]]; then printf '  Subscription:       tcp/%s\n' "$SUBSCRIPTION_PORT"; fi)
+$(if subscription_public_enabled; then printf '  Subscription:       tcp/%s\n' "$SUBSCRIPTION_PORT"; fi)
 
 不要无脑开放从 ${HOME_PORT_START} 起的整段端口，除非你确认所有端口都会使用。
 启用 UFW 后请另开窗口测试 SSH：

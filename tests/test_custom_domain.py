@@ -42,7 +42,31 @@ class CustomDomainConfigTest(unittest.TestCase):
         self.assertEqual(env["REALITY_HANDSHAKE_SERVER"], "127.0.0.1")
         self.assertEqual(env["REALITY_HANDSHAKE_PORT"], "8443")
         self.assertEqual(env["NGINX_FALLBACK_ROOT"], "/var/www/reality-fallback")
+        self.assertEqual(env["SUBSCRIPTION_PORT"], "")
+        self.assertEqual(env["SUBSCRIPTION_INTERNAL_PORT"], "51040")
+        self.assertEqual(env["SUBSCRIPTION_LISTEN_PORT"], "51040")
         self.assertEqual(env["SUBSCRIPTION_BASE_URL"], "https://edge.example.com")
+
+    def test_custom_domain_can_enable_public_subscription_port(self):
+        env = self.custom_domain_env(SUBSCRIPTION_PORT="51041")
+
+        gen.validate_env(env)
+
+        self.assertEqual(env["SUBSCRIPTION_PORT"], "51041")
+        self.assertEqual(env["SUBSCRIPTION_LISTEN_PORT"], "51041")
+
+    def test_non_custom_domain_keeps_default_public_subscription_port(self):
+        env = gen.defaults({
+            "SERVER_ALIAS": "edge",
+            "SERVER_IP_IPV4": "203.0.113.10",
+            "ENABLE_CUSTOM_DOMAIN": "false",
+            "SUBSCRIPTION_PORT": "",
+        })
+
+        gen.validate_env(env)
+
+        self.assertEqual(env["SUBSCRIPTION_PORT"], "51040")
+        self.assertEqual(env["SUBSCRIPTION_LISTEN_PORT"], "51040")
 
     def test_fallback_site_writes_static_page_assets(self):
         script = (ROOT / "scripts" / "15-setup-custom-domain.sh").read_text(encoding="utf-8")
@@ -53,6 +77,17 @@ class CustomDomainConfigTest(unittest.TestCase):
         self.assertIn("$NGINX_FALLBACK_ROOT/favicon.ico", script)
         self.assertIn("curl --noproxy '*' -fsS --resolve", script)
         self.assertIn("$base_url/healthz", script)
+
+    def test_subscription_scripts_use_derived_listen_and_public_ports(self):
+        subscription_script = (ROOT / "scripts" / "13-setup-subscription.sh").read_text(encoding="utf-8")
+        nginx_script = (ROOT / "scripts" / "15-setup-custom-domain.sh").read_text(encoding="utf-8")
+        firewall_script = (ROOT / "scripts" / "09-apply-firewall.sh").read_text(encoding="utf-8")
+
+        self.assertIn("--port $SUBSCRIPTION_LISTEN_PORT", subscription_script)
+        self.assertIn("subscription_public_enabled", subscription_script)
+        self.assertIn('custom_domain_enabled && sub_ipv4="true"', subscription_script)
+        self.assertIn("127.0.0.1:$SUBSCRIPTION_LISTEN_PORT", nginx_script)
+        self.assertIn("subscription_public_enabled", firewall_script)
 
     def test_custom_domain_requires_public_443_for_singbox(self):
         env = self.custom_domain_env(DIRECT_PORT="444")

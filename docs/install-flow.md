@@ -84,7 +84,7 @@ sudo bash bootstrap.sh --phase firewall
 
 UFW 只放行 SSH、`DIRECT_PORT`、`home-proxies.csv` 和 `upstream-nodes.txt` 中实际使用的 `listen_port`。服务商安全组也要手动放行同样端口。
 
-如果 `ENABLE_SUBSCRIPTION_SERVER=true` 且未启用自有域名，还会放行 `SUBSCRIPTION_PORT`，默认是 `51040`。启用自有域名时，订阅服务只绑定本机并由 Nginx fallback 反代，不开放订阅端口。
+如果 `ENABLE_SUBSCRIPTION_SERVER=true` 且公网直连订阅端口已启用，还会放行 `SUBSCRIPTION_PORT`。启用自有域名且 `SUBSCRIPTION_PORT` 留空时，订阅服务只绑定本机 `SUBSCRIPTION_INTERNAL_PORT` 并由 Nginx fallback 反代，不开放订阅端口。
 
 ## 6. 验证
 

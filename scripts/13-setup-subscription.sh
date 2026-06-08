@@ -77,8 +77,9 @@ else
   bind_mode="public"
   sub_ipv4="$([[ -n "$SERVER_IP_IPV4" ]] && echo true || echo false)"
   sub_ipv6="$([[ -n "$SERVER_IP_IPV6" ]] && echo true || echo false)"
-  custom_domain_enabled && bind_mode="localhost"
-  if custom_domain_enabled; then
+  custom_domain_enabled && sub_ipv4="true"
+  if ! subscription_public_enabled; then
+    bind_mode="localhost"
     sub_ipv4="true"
     sub_ipv6="false"
   fi
@@ -91,7 +92,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=$SUBSCRIPTION_DIR
-ExecStart=/usr/bin/python3 $SERVER_INSTALL_PATH --root $SUBSCRIPTION_DIR --port $SUBSCRIPTION_PORT --ipv4 $sub_ipv4 --ipv6 $sub_ipv6 --bind $bind_mode --token-file $VLESS_UUID_PATH --default-target $SUBSCRIPTION_TARGET
+ExecStart=/usr/bin/python3 $SERVER_INSTALL_PATH --root $SUBSCRIPTION_DIR --port $SUBSCRIPTION_LISTEN_PORT --ipv4 $sub_ipv4 --ipv6 $sub_ipv6 --bind $bind_mode --token-file $VLESS_UUID_PATH --default-target $SUBSCRIPTION_TARGET
 Restart=on-failure
 RestartSec=3
 
@@ -115,14 +116,15 @@ cat <<EOF
 $(if [[ -n "${SUBSCRIPTION_BASE_URL:-}" ]]; then
   base="${SUBSCRIPTION_BASE_URL%/}"
   printf '  %s:  %s%s\n' "$target_label" "$base" "$target_path"
-elif [[ -n "$(server_ipv4_hosts)" ]]; then
+fi)
+$(if subscription_public_enabled && [[ -n "$(server_ipv4_hosts)" ]]; then
   printf 'IPv4:\n'
   for host in $(server_ipv4_hosts); do
     h="$(url_host "$host")"
     printf '  %s:  http://%s:%s%s\n' "$target_label" "$h" "$SUBSCRIPTION_PORT" "$target_path"
   done
 fi)
-$(if [[ -z "${SUBSCRIPTION_BASE_URL:-}" && -n "$(server_ipv6_hosts)" ]]; then
+$(if subscription_public_enabled && [[ -n "$(server_ipv6_hosts)" ]]; then
   printf '\nIPv6:\n'
   for host in $(server_ipv6_hosts); do
     h="$(url_host "$host")"
@@ -132,7 +134,11 @@ fi)
 
 $(if custom_domain_enabled; then
   printf '说明：订阅内容按 CUSTOM_DOMAIN 生成；HTTPS 订阅经 sing-box Reality fallback 转到本机 Nginx，再反代到内置订阅服务。\n'
-  printf '公网只需要放行 tcp/443；如不需要直接 HTTP 订阅，可在服务商安全组中不放行 tcp/%s。\n' "$SUBSCRIPTION_PORT"
+  if subscription_public_enabled; then
+    printf '同时启用了直接 HTTP 订阅端口；请确认 UFW 和服务商安全组放行 tcp/%s。\n' "$SUBSCRIPTION_PORT"
+  else
+    printf '未设置 SUBSCRIPTION_PORT，公网只需要放行 tcp/443；内部订阅服务监听本机 tcp/%s。\n' "$SUBSCRIPTION_LISTEN_PORT"
+  fi
 else
   printf '说明：订阅内容按 SERVER_IP_IPV4/SERVER_IP_IPV6 生成；如果两者都填写，IPv4/IPv6 链接都返回同一份完整节点，IPv6 节点名称追加 -IPv6。\n'
   printf '如客户端无法导入 IPv6 字面量订阅地址，有 IPv4 时直接使用 IPv4 订阅地址即可。\n'

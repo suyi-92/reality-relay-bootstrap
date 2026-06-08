@@ -318,11 +318,14 @@ sudo bash bootstrap.sh --phase validate
 
 ```bash
 ENABLE_SUBSCRIPTION_SERVER="true"
-SUBSCRIPTION_PORT="51040"
+SUBSCRIPTION_PORT=""
+SUBSCRIPTION_INTERNAL_PORT="51040"
 SUBSCRIPTION_TARGET="ClashMeta"
 # 可选：如外层有 HTTPS 反代，仅用于输出订阅链接。
 SUBSCRIPTION_BASE_URL=""
 ```
+
+未启用自有域名时，`SUBSCRIPTION_PORT` 留空会自动回退为 `SUBSCRIPTION_INTERNAL_PORT`，也就是默认 `51040`。
 
 更新订阅服务：
 
@@ -337,7 +340,8 @@ sudo bash bootstrap.sh --phase firewall
 http://服务器IP:51040/sub/<VLESS_UUID>?target=ClashMeta
 ```
 
-内置服务是 HTTP，URL 里的 token 使用 `/etc/reality-relay-bootstrap/vless-uuid.txt`。未启用自有域名时，仍建议只在服务商安全组里放行你的常用来源 IP。启用自有域名时，订阅服务只监听本机，外部通过 `https://CUSTOM_DOMAIN/sub/<token>?target=ClashMeta` 访问。
+内置服务是 HTTP，URL 里的 token 使用 `/etc/reality-relay-bootstrap/vless-uuid.txt`。未启用自有域名时，仍建议只在服务商安全组里放行你的常用来源 IP。启用自有域名时，订阅服务默认只监听本机 `SUBSCRIPTION_INTERNAL_PORT`，外部通过 `https://CUSTOM_DOMAIN/sub/<token>?target=ClashMeta` 访问。
+启用自有域名时，`SUBSCRIPTION_PORT` 默认留空；只有显式填写它时，才会额外开放并显示 `http://SERVER_IP:SUBSCRIPTION_PORT/sub/...` 直连订阅链接。
 `SUBSCRIPTION_TARGET` 当前只生成 ClashMeta/Mihomo YAML；旧配置里的其它 target 会警告并按 ClashMeta 处理，旧 URL target 不再兼容。
 如果同时配置了 IPv4 和 IPv6，两个订阅链接都返回同一份完整节点；IPv4 节点名称保持不变，IPv6 节点名称追加 `-IPv6`。
 如果 Clash Verge 或浏览器无法导入 IPv6 字面量订阅地址，有 IPv4 时直接用 IPv4 订阅地址即可，它会返回同一份完整节点。
@@ -385,11 +389,11 @@ alpn:
 SSH:        tcp/$SSH_PORT
 VLESS:      tcp/$DIRECT_PORT
 VLESS:      tcp/CSV 中每个 listen_port
-订阅:       tcp/$SUBSCRIPTION_PORT（仅 ENABLE_SUBSCRIPTION_SERVER=true 且未启用自有域名）
+订阅:       tcp/$SUBSCRIPTION_PORT（仅 ENABLE_SUBSCRIPTION_SERVER=true 且公网直连订阅端口已启用）
 ```
 
 服务商安全组/云防火墙也必须手动放行同样端口。
-启用自有域名时，`SUBSCRIPTION_PORT` 只在本机监听并由 Nginx fallback 反代，公网安全组只需要放行 SSH 和实际 VLESS 端口。
+启用自有域名且 `SUBSCRIPTION_PORT` 留空时，订阅服务只监听本机 `SUBSCRIPTION_INTERNAL_PORT` 并由 Nginx fallback 反代，公网安全组只需要放行 SSH 和实际 VLESS 端口。
 
 ## 验证
 

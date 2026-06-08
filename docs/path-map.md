@@ -37,7 +37,7 @@
 | `/var/www/reality-fallback/favicon.ico` | fallback 静态文件 | `custom-domain` | `0644` | 否 | 默认空文件，用于避免浏览器 favicon 请求 404。 |
 | `/etc/letsencrypt/live/$CUSTOM_DOMAIN/` | 证书目录 | `custom-domain` | certbot 管理 | 是 | Let's Encrypt 证书和私钥。不要手动改权限或移动。 |
 | `/etc/letsencrypt/renewal-hooks/deploy/reality-relay-bootstrap-nginx.sh` | 证书续期 hook | `custom-domain` | `0755` | 否 | 证书续期后自动 reload/restart Nginx。 |
-| `/etc/systemd/system/reality-relay-subscription.service` | systemd 服务 | `subscription` | `0644` | 否 | 内置订阅 HTTP 服务。启用自有域名时只监听本机，由 Nginx 反代。 |
+| `/etc/systemd/system/reality-relay-subscription.service` | systemd 服务 | `subscription` | `0644` | 否 | 内置订阅 HTTP 服务。启用自有域名且 `SUBSCRIPTION_PORT` 留空时只监听本机，由 Nginx 反代。 |
 | `/usr/local/lib/reality-relay-bootstrap/subscription-server.py` | 订阅服务程序 | `subscription` | `0755` | 否 | 安装后的订阅服务脚本。 |
 | `/root/reality-relay-bootstrap-nodes.txt` | 手动输出文件 | `output-nodes` | `600` | 是 | 纯文本节点列表。默认不主动生成，除非执行 `output-nodes`。 |
 | `/root/reality-relay-bootstrap-clash.yaml` | 手动输出文件 | `output-nodes` | `600` | 是 | Clash/Mihomo 配置。默认不主动生成，除非执行 `output-nodes`。 |

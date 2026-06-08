@@ -371,6 +371,7 @@ CLASH_MIXED_PORT="7890"
 
 ENABLE_SUBSCRIPTION_SERVER=$(shell_quote "$enable_subscription_server")
 SUBSCRIPTION_PORT=$(shell_quote "$subscription_port")
+SUBSCRIPTION_INTERNAL_PORT="51040"
 SUBSCRIPTION_TARGET=$(shell_quote "$subscription_target")
 SUBSCRIPTION_BASE_URL=$(shell_quote "$subscription_base_url")
 SUBSCRIPTION_DIR="/etc/reality-relay-bootstrap/subscription"
@@ -580,13 +581,14 @@ run_install_flow() {
     printf '\n订阅链接：\n'
     if [[ "$enable_custom_domain" == "true" ]]; then
       printf '  %s:  https://%s%s\n' "$target_label" "$custom_domain" "$target_path"
-    elif [[ -n "$server_ip_ipv4" ]]; then
+    fi
+    if [[ -n "$subscription_port" && -n "$server_ip_ipv4" ]]; then
       local h4
       h4="$(url_host "$server_ip_ipv4")"
       printf 'IPv4:\n'
       printf '  %s:  http://%s:%s%s\n' "$target_label" "$h4" "$subscription_port" "$target_path"
     fi
-    if [[ -n "$server_ip_ipv6" ]]; then
+    if [[ -n "$subscription_port" && -n "$server_ip_ipv6" ]]; then
       local h6
       h6="$(url_host "$server_ip_ipv6")"
       printf '\nIPv6:\n'
@@ -594,6 +596,11 @@ run_install_flow() {
     fi
     if [[ "$enable_custom_domain" == "true" ]]; then
       printf '\n说明：订阅内容按 CUSTOM_DOMAIN 生成，普通 HTTPS 流量经 sing-box Reality fallback 转到本机 Nginx。\n'
+      if [[ -n "$subscription_port" ]]; then
+        printf '同时启用了直接 HTTP 订阅端口；请确认 UFW 和服务商安全组放行 tcp/%s。\n' "$subscription_port"
+      else
+        printf '未设置 SUBSCRIPTION_PORT，仅显示域名 HTTPS 订阅；内部订阅服务监听本机默认端口。\n'
+      fi
     else
       printf '\n说明：订阅内容按 SERVER_IP_IPV4/SERVER_IP_IPV6 生成；如果两者都填写，IPv4/IPv6 链接都返回同一份完整节点，IPv6 节点名称追加 -IPv6。\n'
       printf '如客户端无法导入 IPv6 字面量订阅地址，有 IPv4 时直接使用 IPv4 订阅地址即可。\n'
@@ -647,10 +654,14 @@ main() {
   printf '%b\n' "${CYAN}${BOLD}节点订阅配置${RESET}"
   reset_proxy_keys="$(read_bool_value "RESET_PROXY_KEYS" "true")"
   enable_subscription_server="$(read_bool_value "ENABLE_SUBSCRIPTION_SERVER" "true")"
-  subscription_port="51040"
+  subscription_port=""
   subscription_target="ClashMeta"
   if [[ "$enable_subscription_server" == "true" ]]; then
-    subscription_port="$(read_default "SUBSCRIPTION_PORT" "51040")"
+    if [[ "$enable_custom_domain" == "true" ]]; then
+      subscription_port="$(read_default "SUBSCRIPTION_PORT（可选公网直连 HTTP 订阅端口；留空则只显示域名订阅）" "")"
+    else
+      subscription_port="$(read_default "SUBSCRIPTION_PORT" "51040")"
+    fi
   fi
   home_port_start="$(read_default "HOME_PORT_START" "51043")"
   home_port_end="65535"

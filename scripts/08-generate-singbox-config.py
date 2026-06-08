@@ -199,7 +199,9 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
         "CLIENT_ALPN": "h2,http/1.1",
         "CLASH_MIXED_PORT": "7890",
         "ENABLE_SUBSCRIPTION_SERVER": "true",
-        "SUBSCRIPTION_PORT": "51040",
+        "SUBSCRIPTION_PORT": "",
+        "SUBSCRIPTION_INTERNAL_PORT": "51040",
+        "SUBSCRIPTION_LISTEN_PORT": "",
         "SUBSCRIPTION_DIR": f"{state_dir}/subscription",
         "RESET_PROXY_KEYS": "false",
         "SUBSCRIPTION_TARGET": "ClashMeta",
@@ -218,8 +220,9 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
         print(f"WARN: ADMIN_USER={merged.get('ADMIN_USER')} 已废弃；当前统一使用 root。", file=sys.stderr)
         merged["ADMIN_USER"] = "root"
 
-    apply_custom_domain_defaults(merged)
     merged["SUBSCRIPTION_TARGET"] = normalize_subscription_target(merged.get("SUBSCRIPTION_TARGET", "ClashMeta"))
+    apply_custom_domain_defaults(merged)
+    apply_subscription_defaults(merged)
 
     default_state_dir = "/etc/reality-relay-bootstrap"
     if merged["RRB_STATE_DIR"] != default_state_dir:
@@ -256,6 +259,18 @@ def apply_custom_domain_defaults(env: Dict[str, str]) -> None:
         env["SUBSCRIPTION_BASE_URL"] = f"https://{domain}"
     if not env.get("CLOUDFLARE_ZONE_NAME", "").strip():
         env["CLOUDFLARE_ZONE_NAME"] = infer_cloudflare_zone_name(domain)
+
+
+def apply_subscription_defaults(env: Dict[str, str]) -> None:
+    if env.get("ENABLE_SUBSCRIPTION_SERVER", "true").lower() != "true":
+        return
+
+    if custom_domain_enabled(env):
+        env["SUBSCRIPTION_LISTEN_PORT"] = env.get("SUBSCRIPTION_PORT", "").strip() or env["SUBSCRIPTION_INTERNAL_PORT"]
+    else:
+        if not env.get("SUBSCRIPTION_PORT", "").strip():
+            env["SUBSCRIPTION_PORT"] = env["SUBSCRIPTION_INTERNAL_PORT"]
+        env["SUBSCRIPTION_LISTEN_PORT"] = env["SUBSCRIPTION_PORT"]
 
 
 def infer_cloudflare_zone_name(domain: str) -> str:
@@ -333,7 +348,12 @@ def validate_env(env: Dict[str, str]) -> None:
     start = as_port(env, "HOME_PORT_START")
     end = as_port(env, "HOME_PORT_END")
     as_port(env, "REALITY_HANDSHAKE_PORT")
-    as_port(env, "SUBSCRIPTION_PORT")
+    as_port(env, "SUBSCRIPTION_INTERNAL_PORT")
+    if env.get("SUBSCRIPTION_PORT", "").strip():
+        as_port(env, "SUBSCRIPTION_PORT")
+    subscription_listen_port = None
+    if env.get("ENABLE_SUBSCRIPTION_SERVER", "true") == "true":
+        subscription_listen_port = as_port(env, "SUBSCRIPTION_LISTEN_PORT")
     fallback_port = as_port(env, "NGINX_FALLBACK_PORT")
     dns_ttl = as_nonnegative_int(env, "CLOUDFLARE_DNS_TTL")
     as_nonnegative_int(env, "CLOUDFLARE_DNS_PROPAGATION_SECONDS")
@@ -378,6 +398,12 @@ def validate_env(env: Dict[str, str]) -> None:
     for key in ["CLOUDFLARE_API_TOKEN_FILE", "NGINX_FALLBACK_ROOT", "NGINX_FALLBACK_CONF"]:
         if not is_posix_absolute(env[key]):
             raise ConfigError(f"{key} 必须是绝对路径")
+    if env["ENABLE_SUBSCRIPTION_SERVER"] == "true":
+        assert subscription_listen_port is not None
+        if subscription_listen_port in {as_port(env, "SSH_PORT"), direct_port}:
+            raise ConfigError("SUBSCRIPTION_LISTEN_PORT 不能与 SSH_PORT 或 DIRECT_PORT 相同")
+        if start <= subscription_listen_port <= end:
+            raise ConfigError("SUBSCRIPTION_LISTEN_PORT 不能落在 HOME_PORT_START/HOME_PORT_END 范围内")
     if custom_domain_enabled(env):
         domain = env.get("CUSTOM_DOMAIN", "").strip()
         if not domain:
@@ -397,8 +423,11 @@ def validate_env(env: Dict[str, str]) -> None:
             raise ConfigError("ENABLE_CUSTOM_DOMAIN=true 时 LE_EMAIL 必须是有效邮箱")
         if direct_port != 443:
             raise ConfigError("ENABLE_CUSTOM_DOMAIN=true 要求 DIRECT_PORT=443（公网 443 由 sing-box 接管）")
-        if fallback_port in {direct_port, as_port(env, "SSH_PORT"), as_port(env, "SUBSCRIPTION_PORT")}:
-            raise ConfigError("NGINX_FALLBACK_PORT 不能与 DIRECT_PORT、SSH_PORT 或 SUBSCRIPTION_PORT 相同")
+        occupied_ports = {direct_port, as_port(env, "SSH_PORT")}
+        if subscription_listen_port is not None:
+            occupied_ports.add(subscription_listen_port)
+        if fallback_port in occupied_ports:
+            raise ConfigError("NGINX_FALLBACK_PORT 不能与 DIRECT_PORT、SSH_PORT 或 SUBSCRIPTION_LISTEN_PORT 相同")
         if env["REALITY_SERVER_NAME"] != domain:
             raise ConfigError("启用自有域名时 REALITY_SERVER_NAME 必须等于 CUSTOM_DOMAIN")
         if env["REALITY_HANDSHAKE_SERVER"] != env["NGINX_FALLBACK_HOST"]:
