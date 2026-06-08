@@ -71,6 +71,7 @@ class CustomDomainConfigTest(unittest.TestCase):
     def test_fallback_site_writes_static_page_assets(self):
         script = (ROOT / "scripts" / "15-setup-custom-domain.sh").read_text(encoding="utf-8")
 
+        self.assertIn('install -d -m 0755 -o root -g root "$NGINX_FALLBACK_ROOT"', script)
         self.assertIn("<title>Digital Notes</title>", script)
         self.assertIn("This site hosts lightweight static pages and public notes.", script)
         self.assertIn("$NGINX_FALLBACK_ROOT/robots.txt", script)

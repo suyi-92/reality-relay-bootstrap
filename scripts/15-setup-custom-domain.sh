@@ -62,7 +62,7 @@ request_certificate() {
 }
 
 write_fallback_site() {
-  run mkdir -p "$NGINX_FALLBACK_ROOT"
+  run install -d -m 0755 -o root -g root "$NGINX_FALLBACK_ROOT"
   write_root_file "$NGINX_FALLBACK_ROOT/index.html" 0644 <<'EOF'
 <!doctype html>
 <html lang="en">
