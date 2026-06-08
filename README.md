@@ -41,13 +41,16 @@ reality-relay-bootstrap/
     12-rollback.sh
     13-setup-subscription.sh
     13-subscription-server.py
-    14-setup-custom-domain.sh
+    14-setup-cloudflare-dns.sh
+    14-setup-cloudflare-dns.py
+    15-setup-custom-domain.sh
   templates/
     sshd-hardening.conf.tpl
     fail2ban-sshd.local.tpl
     clash-mihomo.yaml.tpl
   docs/
     install-flow.md
+    cloudflare-domain-preflight.md
     recovery.md
     client-setup.md
 ```
@@ -55,6 +58,7 @@ reality-relay-bootstrap/
 ## 完整手册与一键安装
 
 更详细的参数解释、Windows PowerShell 示例、回滚和客户端导入说明，请阅读 [`reality-relay-bootstrap-usage.md`](./reality-relay-bootstrap-usage.md)。
+全新域名第一次托管到 Cloudflare 时，先看 [`docs/cloudflare-domain-preflight.md`](./docs/cloudflare-domain-preflight.md)。
 
 如果是在全新 VPS 上使用推荐默认值部署，可以直接运行一键安装脚本。脚本会自动拉取/定位项目、生成 `config.env`、`home-proxies.csv` 和 `upstream-nodes.txt`，会提示填写服务器 IPv4/IPv6、SSH、入口端口、自有域名、节点订阅配置、root 公钥、家宽代理 CSV 以及可选上游节点：
 
@@ -162,12 +166,21 @@ CLIENT_ALPN="h2,http/1.1"
 ```bash
 ENABLE_CUSTOM_DOMAIN="true"
 CUSTOM_DOMAIN="edge.example.com"
+CLOUDFLARE_ZONE_NAME="example.com"
 LE_EMAIL="admin@example.com"
 CLOUDFLARE_API_TOKEN="Cloudflare DNS API Token"
 CLOUDFLARE_API_TOKEN_FILE="/etc/reality-relay-bootstrap/cloudflare.ini"
+CLOUDFLARE_ENSURE_DNS_RECORDS="true"
+CLOUDFLARE_DNS_OVERWRITE_EXISTING="true"
+CLOUDFLARE_REQUIRE_ACTIVE_ZONE="true"
 NGINX_FALLBACK_HOST="127.0.0.1"
 NGINX_FALLBACK_PORT="8443"
 ```
+
+Cloudflare 侧分两类：
+
+- 必须手动完成：在 Cloudflare 添加/托管 zone，并到域名注册商把 NS 改成 Cloudflare 分配的 nameserver，等待 zone active。
+- 脚本自动完成：用 API token 创建或更新 `CUSTOM_DOMAIN` 的 A/AAAA 记录，`proxied=false`，也就是灰云 / DNS only；默认要求 zone 已经 active，避免后续 Let’s Encrypt DNS-01 失败。
 
 启用后：
 
@@ -177,7 +190,7 @@ NGINX_FALLBACK_PORT="8443"
 - 节点输出里的 `server` 和 `servername` 会使用 `CUSTOM_DOMAIN`。
 - 如果启用订阅服务，订阅 URL 默认为 `https://CUSTOM_DOMAIN/sub/<VLESS_UUID>?target=ClashMeta`，订阅服务只绑定本机并由 Nginx 反代。
 
-Cloudflare API Token 只需要对应 zone 的 DNS 编辑权限；脚本会把 token 写入 600 权限的 credentials 文件。不要打开橙云代理，否则 Reality 443 入口不会直连到服务器。
+Cloudflare API Token 至少需要对应 zone 的 DNS 编辑权限；如果要让脚本自动创建 zone，还需要额外配置 `CLOUDFLARE_CREATE_ZONE=true`、`CLOUDFLARE_ACCOUNT_ID` 和具备 Zone 编辑权限的 token。脚本会把 token 写入 600 权限的 credentials 文件。不要打开橙云代理，否则 Reality 443 入口不会直连到服务器。
 
 ## 443 模式
 
@@ -236,6 +249,7 @@ sudo CONFIRM_ROOT_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final
 
 sudo bash bootstrap.sh --phase fail2ban
 sudo bash bootstrap.sh --phase singbox
+sudo bash bootstrap.sh --phase cloudflare-dns  # 可选预处理；singbox/custom-domain phase 也会自动调用
 sudo bash bootstrap.sh --phase custom-domain   # 仅 ENABLE_CUSTOM_DOMAIN=true 时需要；singbox phase 也会自动调用
 sudo bash bootstrap.sh --phase firewall
 sudo bash bootstrap.sh --phase validate

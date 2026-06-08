@@ -169,6 +169,13 @@ load_config() {
   : "${LE_STAGING:=false}"
   : "${CLOUDFLARE_API_TOKEN:=}"
   : "${CLOUDFLARE_API_TOKEN_FILE:=$RRB_STATE_DIR/cloudflare.ini}"
+  : "${CLOUDFLARE_ZONE_NAME:=}"
+  : "${CLOUDFLARE_ACCOUNT_ID:=}"
+  : "${CLOUDFLARE_CREATE_ZONE:=false}"
+  : "${CLOUDFLARE_ENSURE_DNS_RECORDS:=true}"
+  : "${CLOUDFLARE_DNS_OVERWRITE_EXISTING:=true}"
+  : "${CLOUDFLARE_REQUIRE_ACTIVE_ZONE:=true}"
+  : "${CLOUDFLARE_DNS_TTL:=1}"
   : "${CLOUDFLARE_DNS_PROPAGATION_SECONDS:=60}"
   : "${NGINX_FALLBACK_HOST:=127.0.0.1}"
   : "${NGINX_FALLBACK_PORT:=8443}"
@@ -237,6 +244,20 @@ apply_custom_domain_defaults() {
   fi
   if [[ "$ENABLE_SUBSCRIPTION_SERVER" == "true" && -z "${SUBSCRIPTION_BASE_URL:-}" ]]; then
     SUBSCRIPTION_BASE_URL="https://$CUSTOM_DOMAIN"
+  fi
+  if [[ -z "${CLOUDFLARE_ZONE_NAME:-}" ]]; then
+    CLOUDFLARE_ZONE_NAME="$(infer_cloudflare_zone_name "$CUSTOM_DOMAIN")"
+  fi
+}
+
+infer_cloudflare_zone_name() {
+  local domain="$1" parts count
+  IFS='.' read -r -a parts <<<"$domain"
+  count="${#parts[@]}"
+  if (( count >= 2 )); then
+    printf '%s.%s\n' "${parts[count-2]}" "${parts[count-1]}"
+  else
+    printf '%s\n' "$domain"
   fi
 }
 
@@ -349,11 +370,16 @@ validate_config_basics() {
   validate_bool ENABLE_IPV6_LISTEN
   validate_bool ENABLE_CUSTOM_DOMAIN
   validate_bool LE_STAGING
+  validate_bool CLOUDFLARE_CREATE_ZONE
+  validate_bool CLOUDFLARE_ENSURE_DNS_RECORDS
+  validate_bool CLOUDFLARE_DNS_OVERWRITE_EXISTING
+  validate_bool CLOUDFLARE_REQUIRE_ACTIVE_ZONE
   validate_bool REJECT_CN_PRIVATE
   validate_bool CLIENT_UDP
   validate_bool ENABLE_SUBSCRIPTION_SERVER
   validate_bool RESET_PROXY_KEYS
   validate_port NGINX_FALLBACK_PORT
+  validate_nonnegative_int CLOUDFLARE_DNS_TTL
   validate_nonnegative_int CLOUDFLARE_DNS_PROPAGATION_SECONDS
   validate_user_name ADMIN_USER
   validate_user_name SFTP_USER
@@ -380,7 +406,13 @@ validate_config_basics() {
   if custom_domain_enabled; then
     [[ -n "$CUSTOM_DOMAIN" ]] || die "ENABLE_CUSTOM_DOMAIN=true 时 CUSTOM_DOMAIN 不能为空"
     [[ "$CUSTOM_DOMAIN" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$ && "$CUSTOM_DOMAIN" == *.* && "$CUSTOM_DOMAIN" != *..* ]] || die "CUSTOM_DOMAIN 不合法：$CUSTOM_DOMAIN"
+    [[ -n "$CLOUDFLARE_ZONE_NAME" ]] || die "ENABLE_CUSTOM_DOMAIN=true 时 CLOUDFLARE_ZONE_NAME 不能为空"
+    [[ "$CLOUDFLARE_ZONE_NAME" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$ && "$CLOUDFLARE_ZONE_NAME" == *.* && "$CLOUDFLARE_ZONE_NAME" != *..* ]] || die "CLOUDFLARE_ZONE_NAME 不合法：$CLOUDFLARE_ZONE_NAME"
+    (( CLOUDFLARE_DNS_TTL == 1 || CLOUDFLARE_DNS_TTL >= 60 )) || die "CLOUDFLARE_DNS_TTL 必须为 1（自动）或 >=60"
     [[ "$LE_EMAIL" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]] || die "ENABLE_CUSTOM_DOMAIN=true 时 LE_EMAIL 必须是有效邮箱"
+    if [[ "$CLOUDFLARE_CREATE_ZONE" == "true" ]]; then
+      [[ -n "$CLOUDFLARE_ACCOUNT_ID" ]] || die "CLOUDFLARE_CREATE_ZONE=true 时 CLOUDFLARE_ACCOUNT_ID 不能为空"
+    fi
     [[ "$DIRECT_PORT" == "443" ]] || die "ENABLE_CUSTOM_DOMAIN=true 要求 DIRECT_PORT=443（公网 443 由 sing-box 接管）"
     [[ "$NGINX_FALLBACK_PORT" != "$DIRECT_PORT" ]] || die "NGINX_FALLBACK_PORT 不能与 DIRECT_PORT 相同"
     [[ "$NGINX_FALLBACK_PORT" != "$SSH_PORT" ]] || die "NGINX_FALLBACK_PORT 不能与 SSH_PORT 相同"

@@ -18,6 +18,7 @@ def load_module(name: str, path: Path):
 
 gen = load_module("gen", ROOT / "scripts" / "08-generate-singbox-config.py")
 nodes = load_module("nodes", ROOT / "scripts" / "11-output-nodes.py")
+cf_dns = load_module("cf_dns", ROOT / "scripts" / "14-setup-cloudflare-dns.py")
 
 
 class CustomDomainConfigTest(unittest.TestCase):
@@ -67,6 +68,27 @@ class CustomDomainConfigTest(unittest.TestCase):
         env = self.custom_domain_env()
 
         self.assertEqual(nodes.get_server_ip(env, "203.0.113.10"), "edge.example.com")
+
+    def test_cloudflare_zone_name_is_inferred_from_custom_domain(self):
+        env = self.custom_domain_env(CUSTOM_DOMAIN="edge.example.com")
+
+        self.assertEqual(env["CLOUDFLARE_ZONE_NAME"], "example.com")
+
+    def test_cloudflare_desired_records_include_ipv4_and_ipv6(self):
+        env = self.custom_domain_env(SERVER_IP_IPV6="2001:db8::10")
+
+        self.assertEqual(cf_dns.desired_records(env), [("A", "203.0.113.10"), ("AAAA", "2001:db8::10")])
+
+    def test_cloudflare_record_payload_is_dns_only(self):
+        env = self.custom_domain_env()
+
+        payload = cf_dns.record_payload(env, "A", "203.0.113.10")
+
+        self.assertEqual(payload["name"], "edge.example.com")
+        self.assertEqual(payload["type"], "A")
+        self.assertEqual(payload["content"], "203.0.113.10")
+        self.assertIs(payload["proxied"], False)
+        self.assertEqual(payload["ttl"], 1)
 
 
 if __name__ == "__main__":

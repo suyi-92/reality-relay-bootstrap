@@ -170,6 +170,13 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
         "LE_STAGING": "false",
         "CLOUDFLARE_API_TOKEN": "",
         "CLOUDFLARE_API_TOKEN_FILE": f"{state_dir}/cloudflare.ini",
+        "CLOUDFLARE_ZONE_NAME": "",
+        "CLOUDFLARE_ACCOUNT_ID": "",
+        "CLOUDFLARE_CREATE_ZONE": "false",
+        "CLOUDFLARE_ENSURE_DNS_RECORDS": "true",
+        "CLOUDFLARE_DNS_OVERWRITE_EXISTING": "true",
+        "CLOUDFLARE_REQUIRE_ACTIVE_ZONE": "true",
+        "CLOUDFLARE_DNS_TTL": "1",
         "CLOUDFLARE_DNS_PROPAGATION_SECONDS": "60",
         "NGINX_FALLBACK_HOST": "127.0.0.1",
         "NGINX_FALLBACK_PORT": "8443",
@@ -247,6 +254,15 @@ def apply_custom_domain_defaults(env: Dict[str, str]) -> None:
         env["REALITY_HANDSHAKE_PORT"] = env.get("NGINX_FALLBACK_PORT", "8443")
     if env.get("ENABLE_SUBSCRIPTION_SERVER", "true").lower() == "true" and not env.get("SUBSCRIPTION_BASE_URL", ""):
         env["SUBSCRIPTION_BASE_URL"] = f"https://{domain}"
+    if not env.get("CLOUDFLARE_ZONE_NAME", "").strip():
+        env["CLOUDFLARE_ZONE_NAME"] = infer_cloudflare_zone_name(domain)
+
+
+def infer_cloudflare_zone_name(domain: str) -> str:
+    labels = [part for part in domain.strip(".").split(".") if part]
+    if len(labels) >= 2:
+        return ".".join(labels[-2:])
+    return domain
 
 
 def normalize_subscription_target(value: str) -> str:
@@ -319,6 +335,7 @@ def validate_env(env: Dict[str, str]) -> None:
     as_port(env, "REALITY_HANDSHAKE_PORT")
     as_port(env, "SUBSCRIPTION_PORT")
     fallback_port = as_port(env, "NGINX_FALLBACK_PORT")
+    dns_ttl = as_nonnegative_int(env, "CLOUDFLARE_DNS_TTL")
     as_nonnegative_int(env, "CLOUDFLARE_DNS_PROPAGATION_SECONDS")
     if start > end:
         raise ConfigError("HOME_PORT_START 不能大于 HOME_PORT_END")
@@ -345,6 +362,10 @@ def validate_env(env: Dict[str, str]) -> None:
         "ENABLE_IPV6_LISTEN",
         "ENABLE_CUSTOM_DOMAIN",
         "LE_STAGING",
+        "CLOUDFLARE_CREATE_ZONE",
+        "CLOUDFLARE_ENSURE_DNS_RECORDS",
+        "CLOUDFLARE_DNS_OVERWRITE_EXISTING",
+        "CLOUDFLARE_REQUIRE_ACTIVE_ZONE",
         "REJECT_CN_PRIVATE",
         "CLIENT_UDP",
         "ENABLE_SUBSCRIPTION_SERVER",
@@ -363,6 +384,15 @@ def validate_env(env: Dict[str, str]) -> None:
             raise ConfigError("ENABLE_CUSTOM_DOMAIN=true 时 CUSTOM_DOMAIN 不能为空")
         if not CUSTOM_DOMAIN_RE.match(domain) or "." not in domain or ".." in domain:
             raise ConfigError(f"CUSTOM_DOMAIN 不合法：{domain}")
+        zone_name = env.get("CLOUDFLARE_ZONE_NAME", "").strip()
+        if not zone_name:
+            raise ConfigError("ENABLE_CUSTOM_DOMAIN=true 时 CLOUDFLARE_ZONE_NAME 不能为空")
+        if not CUSTOM_DOMAIN_RE.match(zone_name) or "." not in zone_name or ".." in zone_name:
+            raise ConfigError(f"CLOUDFLARE_ZONE_NAME 不合法：{zone_name}")
+        if dns_ttl not in {1} and dns_ttl < 60:
+            raise ConfigError("CLOUDFLARE_DNS_TTL 必须为 1（自动）或 >=60")
+        if env["CLOUDFLARE_CREATE_ZONE"] == "true" and not env.get("CLOUDFLARE_ACCOUNT_ID", "").strip():
+            raise ConfigError("CLOUDFLARE_CREATE_ZONE=true 时 CLOUDFLARE_ACCOUNT_ID 不能为空")
         if not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", env.get("LE_EMAIL", "")):
             raise ConfigError("ENABLE_CUSTOM_DOMAIN=true 时 LE_EMAIL 必须是有效邮箱")
         if direct_port != 443:
@@ -1017,7 +1047,7 @@ def print_summary(env: Dict[str, str], rows: List[Dict[str, Any]]) -> None:
     print(f"Reality server_name：{env['REALITY_SERVER_NAME']}")
     print(f"Reality handshake：{env['REALITY_HANDSHAKE_SERVER']}:{env['REALITY_HANDSHAKE_PORT']}")
     if custom_domain_enabled(env):
-        print(f"自有域名：{env['CUSTOM_DOMAIN']}（Cloudflare DNS 灰云；Nginx fallback {env['NGINX_FALLBACK_HOST']}:{env['NGINX_FALLBACK_PORT']}）")
+        print(f"自有域名：{env['CUSTOM_DOMAIN']}（Cloudflare zone: {env['CLOUDFLARE_ZONE_NAME']}；DNS 灰云；Nginx fallback {env['NGINX_FALLBACK_HOST']}:{env['NGINX_FALLBACK_PORT']}）")
     if env["MODE_443"] == "smart":
         outbound, tag = select_ai_outbound(env, rows)
         print(f"Smart 443 AI 出口：{tag} ({outbound})")

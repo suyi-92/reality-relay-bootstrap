@@ -20,6 +20,7 @@ firewall       -> 安装/配置 UFW，只开放实际使用端口
 validate       -> 验证 SSH、fail2ban、UFW、sing-box、监听端口、家宽代理和上游节点
 output-nodes   -> 可选生成客户端节点文件
 subscription   -> 单独安装/更新简单订阅端口
+cloudflare-dns -> 可选在 Cloudflare 准备 DNS only / 灰云 A/AAAA 记录
 custom-domain  -> 可选配置 Cloudflare DNS-01 证书和本机 Nginx fallback
 rollback       -> 回滚 SSH 加固、sing-box 配置，可选处理 UFW
 ```
@@ -80,6 +81,7 @@ sudo bash install.sh
 | `DIRECT_PORT` | `443` | VLESS+Reality 直连入口端口 |
 | `ENABLE_CUSTOM_DOMAIN` | `false` | 是否启用自有域名、Cloudflare DNS-01 和 Nginx fallback |
 | `CUSTOM_DOMAIN` | 空 | 自有域名；启用后节点 server/servername 使用它 |
+| `CLOUDFLARE_ZONE_NAME` | 自动按域名后两段推断 | Cloudflare zone 名；如 `edge.example.com` 对应 `example.com` |
 | `LE_EMAIL` | 空 | Let's Encrypt 注册邮箱；启用自有域名时必填 |
 | `CLOUDFLARE_API_TOKEN` | 空 | Cloudflare DNS API Token；用于 DNS-01 申请证书 |
 | `RESET_PROXY_KEYS` | `false` | 是否重置 VLESS UUID、Reality keypair 和 short-id |
@@ -259,6 +261,13 @@ LE_EMAIL=""
 LE_STAGING="false"
 CLOUDFLARE_API_TOKEN=""
 CLOUDFLARE_API_TOKEN_FILE="/etc/reality-relay-bootstrap/cloudflare.ini"
+CLOUDFLARE_ZONE_NAME=""
+CLOUDFLARE_ACCOUNT_ID=""
+CLOUDFLARE_CREATE_ZONE="false"
+CLOUDFLARE_ENSURE_DNS_RECORDS="true"
+CLOUDFLARE_DNS_OVERWRITE_EXISTING="true"
+CLOUDFLARE_REQUIRE_ACTIVE_ZONE="true"
+CLOUDFLARE_DNS_TTL="1"
 CLOUDFLARE_DNS_PROPAGATION_SECONDS="60"
 NGINX_FALLBACK_HOST="127.0.0.1"
 NGINX_FALLBACK_PORT="8443"
@@ -496,12 +505,13 @@ www.microsoft.com
 ```bash
 ENABLE_CUSTOM_DOMAIN="true"
 CUSTOM_DOMAIN="edge.example.com"
+CLOUDFLARE_ZONE_NAME="example.com"
 LE_EMAIL="admin@example.com"
 CLOUDFLARE_API_TOKEN="Cloudflare DNS API Token"
 NGINX_FALLBACK_PORT="8443"
 ```
 
-脚本默认按 Cloudflare DNS 灰云 / DNS only 处理。公网 `443` 继续由 sing-box 监听，普通 TLS fallback 到本机 Nginx `127.0.0.1:8443`；`REALITY_SERVER_NAME` 会自动回填为 `CUSTOM_DOMAIN`，`REALITY_HANDSHAKE_SERVER` 会回填为 `127.0.0.1`，`REALITY_HANDSHAKE_PORT` 会回填为 `NGINX_FALLBACK_PORT`。订阅服务启用时只绑定本机，并通过 `https://CUSTOM_DOMAIN/sub/<VLESS_UUID>?target=ClashMeta` 对外访问。
+Cloudflare 侧需要先在控制台添加/托管 zone，并到域名注册商把 NS 改成 Cloudflare 分配的 nameserver。脚本默认会用 API token 创建或更新 `CUSTOM_DOMAIN` 的 A/AAAA 记录，`proxied=false`，也就是灰云 / DNS only。公网 `443` 继续由 sing-box 监听，普通 TLS fallback 到本机 Nginx `127.0.0.1:8443`；`REALITY_SERVER_NAME` 会自动回填为 `CUSTOM_DOMAIN`，`REALITY_HANDSHAKE_SERVER` 会回填为 `127.0.0.1`，`REALITY_HANDSHAKE_PORT` 会回填为 `NGINX_FALLBACK_PORT`。订阅服务启用时只绑定本机，并通过 `https://CUSTOM_DOMAIN/sub/<VLESS_UUID>?target=ClashMeta` 对外访问。
 
 ### 5.7 客户端输出变量
 
@@ -779,7 +789,7 @@ sudo bash bootstrap.sh --phase singbox
 - 执行 `sing-box check -c /etc/sing-box/config.json`。
 - check 通过后重启 sing-box。
 - 如果 `ENABLE_SUBSCRIPTION_SERVER=true`，生成并启动订阅服务。
-- 如果 `ENABLE_CUSTOM_DOMAIN=true`，使用 Cloudflare DNS-01 申请 Let's Encrypt 证书，并配置本机 Nginx fallback。
+- 如果 `ENABLE_CUSTOM_DOMAIN=true`，先准备 Cloudflare 灰云 A/AAAA，再使用 Cloudflare DNS-01 申请 Let's Encrypt 证书，并配置本机 Nginx fallback。
 
 生成后的重要文件：
 
@@ -925,6 +935,7 @@ sudo CONFIRM_ROOT_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final
 
 sudo bash bootstrap.sh --phase fail2ban
 sudo bash bootstrap.sh --phase singbox
+sudo bash bootstrap.sh --phase cloudflare-dns   # 可选预处理；singbox/custom-domain phase 已会自动调用
 sudo bash bootstrap.sh --phase custom-domain   # 可选；singbox phase 已会自动调用
 sudo bash bootstrap.sh --phase firewall
 sudo bash bootstrap.sh --phase validate

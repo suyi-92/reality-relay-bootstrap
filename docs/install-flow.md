@@ -20,12 +20,13 @@ nano upstream-nodes.txt
 ```bash
 ENABLE_CUSTOM_DOMAIN="true"
 CUSTOM_DOMAIN="edge.example.com"
+CLOUDFLARE_ZONE_NAME="example.com"
 LE_EMAIL="admin@example.com"
 CLOUDFLARE_API_TOKEN="Cloudflare DNS API Token"
 NGINX_FALLBACK_PORT="8443"
 ```
 
-启用后公网 `443` 仍由 sing-box 监听，普通 TLS fallback 到本机 Nginx `127.0.0.1:8443`。
+启用前需要先在 Cloudflare 添加/托管 zone，并在域名注册商处把 NS 改成 Cloudflare 分配的 nameserver，等待 zone active。细节见 [`cloudflare-domain-preflight.md`](./cloudflare-domain-preflight.md)。脚本会自动创建或更新 `CUSTOM_DOMAIN` 的 A/AAAA 灰云记录；启用后公网 `443` 仍由 sing-box 监听，普通 TLS fallback 到本机 Nginx `127.0.0.1:8443`。
 
 ## 2. SSH 初始化与加固
 
@@ -67,7 +68,7 @@ sudo bash bootstrap.sh --phase singbox
 5. 执行 `sing-box check`。
 6. 通过后重启 sing-box。
 7. 如果 `ENABLE_SUBSCRIPTION_SERVER=true`，生成并启动订阅服务；不会默认输出 `/root` 节点文件。
-8. 如果 `ENABLE_CUSTOM_DOMAIN=true`，通过 Cloudflare DNS-01 申请证书并配置 Nginx fallback。
+8. 如果 `ENABLE_CUSTOM_DOMAIN=true`，先准备 Cloudflare 灰云 A/AAAA，再通过 Cloudflare DNS-01 申请证书并配置 Nginx fallback。
 
 如需在服务器本地额外生成节点文件，可在部署完成后手动执行：
 

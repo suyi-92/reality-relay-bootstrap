@@ -201,6 +201,17 @@ url_host() {
   fi
 }
 
+infer_cloudflare_zone_name() {
+  local domain="$1" parts count
+  IFS='.' read -r -a parts <<<"$domain"
+  count="${#parts[@]}"
+  if (( count >= 2 )); then
+    printf '%s.%s\n' "${parts[count-2]}" "${parts[count-1]}"
+  else
+    printf '%s\n' "$domain"
+  fi
+}
+
 normalize_subscription_target() {
   local raw="${1:-ClashMeta}" lower compact
   lower="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
@@ -268,7 +279,7 @@ ensure_project() {
 }
 
 write_config() {
-  local project_dir="$1" server_alias="$2" server_ip_ipv4="$3" server_ip_ipv6="$4" ssh_port="$5" admin_pubkey="$6" direct_port="$7" enable_subscription_server="$8" subscription_port="$9" subscription_target="${10}" reset_proxy_keys="${11}" home_port_start="${12}" home_port_end="${13}" enable_custom_domain="${14}" custom_domain="${15}" le_email="${16}" cloudflare_api_token="${17}" nginx_fallback_port="${18}"
+  local project_dir="$1" server_alias="$2" server_ip_ipv4="$3" server_ip_ipv6="$4" ssh_port="$5" admin_pubkey="$6" direct_port="$7" enable_subscription_server="$8" subscription_port="$9" subscription_target="${10}" reset_proxy_keys="${11}" home_port_start="${12}" home_port_end="${13}" enable_custom_domain="${14}" custom_domain="${15}" cloudflare_zone_name="${16}" le_email="${17}" cloudflare_api_token="${18}" nginx_fallback_port="${19}"
   local server_ip="$server_ip_ipv4"
   local proxy_ip_version="ipv4"
   local enable_ipv6_listen="false"
@@ -323,6 +334,13 @@ LE_EMAIL=$(shell_quote "$le_email")
 LE_STAGING="false"
 CLOUDFLARE_API_TOKEN=$(shell_quote "$cloudflare_api_token")
 CLOUDFLARE_API_TOKEN_FILE="/etc/reality-relay-bootstrap/cloudflare.ini"
+CLOUDFLARE_ZONE_NAME=$(shell_quote "$cloudflare_zone_name")
+CLOUDFLARE_ACCOUNT_ID=""
+CLOUDFLARE_CREATE_ZONE="false"
+CLOUDFLARE_ENSURE_DNS_RECORDS="true"
+CLOUDFLARE_DNS_OVERWRITE_EXISTING="true"
+CLOUDFLARE_REQUIRE_ACTIVE_ZONE="true"
+CLOUDFLARE_DNS_TTL="1"
 CLOUDFLARE_DNS_PROPAGATION_SECONDS="60"
 NGINX_FALLBACK_HOST="127.0.0.1"
 NGINX_FALLBACK_PORT=$(shell_quote "$nginx_fallback_port")
@@ -596,7 +614,7 @@ main() {
 
   line
   printf '%b\n' "${CYAN}${BOLD}基础信息${RESET}"
-  local server_alias server_ip_ipv4 server_ip_ipv6 ssh_port admin_pubkey direct_port enable_subscription_server subscription_port subscription_target reset_proxy_keys home_port_start home_port_end enable_custom_domain custom_domain le_email cloudflare_api_token nginx_fallback_port
+  local server_alias server_ip_ipv4 server_ip_ipv6 ssh_port admin_pubkey direct_port enable_subscription_server subscription_port subscription_target reset_proxy_keys home_port_start home_port_end enable_custom_domain custom_domain cloudflare_zone_name le_email cloudflare_api_token nginx_fallback_port
   server_alias="$(read_default "SERVER_ALIAS" "")"
   server_ip_ipv4="$(read_default "SERVER_IP_IPv4" "$default_ip")"
   server_ip_ipv6="$(read_default "SERVER_IP_IPv6" "")"
@@ -608,15 +626,18 @@ main() {
   printf '%b\n' "${DIM}默认假设域名托管在 Cloudflare，DNS 记录保持灰云 / DNS only；公网 tcp/443 由 sing-box 监听，本机 8443 给 Nginx fallback。${RESET}"
   enable_custom_domain="$(read_bool_value "ENABLE_CUSTOM_DOMAIN" "false")"
   custom_domain=""
+  cloudflare_zone_name=""
   le_email=""
   cloudflare_api_token=""
   nginx_fallback_port="8443"
   if [[ "$enable_custom_domain" == "true" ]]; then
     custom_domain="$(read_default "CUSTOM_DOMAIN" "")"
+    cloudflare_zone_name="$(read_default "CLOUDFLARE_ZONE_NAME" "$(infer_cloudflare_zone_name "$custom_domain")")"
     le_email="$(read_default "LE_EMAIL" "")"
     cloudflare_api_token="$(read_secret_default "CLOUDFLARE_API_TOKEN" "")"
     nginx_fallback_port="$(read_default "NGINX_FALLBACK_PORT" "8443")"
     [[ -n "$custom_domain" ]] || die "CUSTOM_DOMAIN 不能为空。"
+    [[ -n "$cloudflare_zone_name" ]] || die "CLOUDFLARE_ZONE_NAME 不能为空。"
     [[ -n "$le_email" ]] || die "LE_EMAIL 不能为空。"
     [[ -n "$cloudflare_api_token" ]] || die "CLOUDFLARE_API_TOKEN 不能为空；需要 Cloudflare DNS-01 申请证书。"
     [[ "$direct_port" == "443" ]] || die "启用自有域名时 DIRECT_PORT 必须为 443。"
@@ -649,7 +670,7 @@ main() {
   collect_home_proxies "$ROWS_FILE"
   collect_upstream_nodes "$UPSTREAM_ROWS_FILE" "$ROWS_FILE" "$home_port_start" "$home_port_end"
 
-  write_config "$project_dir" "$server_alias" "$server_ip_ipv4" "$server_ip_ipv6" "$ssh_port" "$admin_pubkey" "$direct_port" "$enable_subscription_server" "$subscription_port" "$subscription_target" "$reset_proxy_keys" "$home_port_start" "$home_port_end" "$enable_custom_domain" "$custom_domain" "$le_email" "$cloudflare_api_token" "$nginx_fallback_port"
+  write_config "$project_dir" "$server_alias" "$server_ip_ipv4" "$server_ip_ipv6" "$ssh_port" "$admin_pubkey" "$direct_port" "$enable_subscription_server" "$subscription_port" "$subscription_target" "$reset_proxy_keys" "$home_port_start" "$home_port_end" "$enable_custom_domain" "$custom_domain" "$cloudflare_zone_name" "$le_email" "$cloudflare_api_token" "$nginx_fallback_port"
   write_home_proxies "$project_dir" "$ROWS_FILE"
   write_upstream_nodes "$project_dir" "$UPSTREAM_ROWS_FILE"
   run_install_flow "$project_dir" "$server_ip_ipv4" "$server_ip_ipv6" "$ssh_port" "$enable_subscription_server" "$subscription_port" "$subscription_target" "$enable_custom_domain" "$custom_domain"
