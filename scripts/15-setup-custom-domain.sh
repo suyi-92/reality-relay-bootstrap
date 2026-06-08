@@ -194,6 +194,21 @@ reload_nginx() {
   fi
 }
 
+curl_fallback_url() {
+  local resolve_arg="$1" url="$2" err output
+  err="$(mktemp)"
+  if ! output="$(timeout 10 curl --noproxy '*' -k -fsS --resolve "$resolve_arg" "$url" 2>"$err")"; then
+    {
+      printf 'fallback curl failed: %s\n' "$url"
+      cat "$err"
+    } >>"$LOG_FILE"
+    rm -f "$err"
+    die "Nginx fallback 请求失败：$url；curl 错误已写入 $LOG_FILE"
+  fi
+  rm -f "$err"
+  printf '%s' "$output"
+}
+
 verify_fallback() {
   local resolve_arg base_url body robots health
   if is_dry_run; then
@@ -208,13 +223,19 @@ verify_fallback() {
   resolve_arg="$CUSTOM_DOMAIN:$NGINX_FALLBACK_PORT:$NGINX_FALLBACK_HOST"
   base_url="https://$CUSTOM_DOMAIN:$NGINX_FALLBACK_PORT"
 
-  body="$(timeout 10 curl --noproxy '*' -fsS --resolve "$resolve_arg" "$base_url/" 2>>"$LOG_FILE" || true)"
-  [[ "$body" == *"<title>Digital Notes</title>"* ]] || die "Nginx fallback 首页内容验证失败：$base_url/"
+  body="$(curl_fallback_url "$resolve_arg" "$base_url/")"
+  if [[ "$body" != *"<title>Digital Notes</title>"* ]]; then
+    {
+      printf 'fallback homepage mismatch: %s/\n' "$base_url"
+      printf '%s\n' "$body" | sed -n '1,40p'
+    } >>"$LOG_FILE"
+    die "Nginx fallback 首页内容验证失败：$base_url/；返回内容前 40 行已写入 $LOG_FILE"
+  fi
 
-  robots="$(timeout 10 curl --noproxy '*' -fsS --resolve "$resolve_arg" "$base_url/robots.txt" 2>>"$LOG_FILE" || true)"
+  robots="$(curl_fallback_url "$resolve_arg" "$base_url/robots.txt")"
   [[ "$robots" == *"User-agent: *"* && "$robots" == *"Allow: /"* ]] || die "Nginx fallback robots.txt 验证失败：$base_url/robots.txt"
 
-  health="$(timeout 10 curl --noproxy '*' -fsS --resolve "$resolve_arg" "$base_url/healthz" 2>>"$LOG_FILE" || true)"
+  health="$(curl_fallback_url "$resolve_arg" "$base_url/healthz")"
   [[ "$health" == "ok" ]] || die "Nginx fallback healthz 验证失败：$base_url/healthz"
 
   info "Nginx fallback 静态站点正常：$base_url/"

@@ -75,7 +75,8 @@ class CustomDomainConfigTest(unittest.TestCase):
         self.assertIn("This site hosts lightweight static pages and public notes.", script)
         self.assertIn("$NGINX_FALLBACK_ROOT/robots.txt", script)
         self.assertIn("$NGINX_FALLBACK_ROOT/favicon.ico", script)
-        self.assertIn("curl --noproxy '*' -fsS --resolve", script)
+        self.assertIn("curl --noproxy '*' -k -fsS --resolve", script)
+        self.assertIn("fallback homepage mismatch", script)
         self.assertIn("$base_url/healthz", script)
 
     def test_subscription_scripts_use_derived_listen_and_public_ports(self):
