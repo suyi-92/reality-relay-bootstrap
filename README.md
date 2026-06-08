@@ -159,6 +159,8 @@ CLIENT_ALPN="h2,http/1.1"
 
 这些文件权限为 600。`home-proxies.csv` 和 `upstream-nodes.txt` 也会以 600 权限复制到 `/etc/reality-relay-bootstrap/`。不要公开 Reality 私钥、UUID、CSV、上游节点和节点文件。
 
+完整生成路径、权限、敏感性和清理建议见 [`docs/path-map.md`](docs/path-map.md)。
+
 ## 自有域名与 Nginx fallback
 
 可选启用自有域名。默认假设 DNS 托管在 Cloudflare，记录保持灰云 / DNS only，A/AAAA 指向服务器公网 IP：

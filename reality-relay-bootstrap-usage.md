@@ -53,6 +53,8 @@ upstream-nodes.txt
 /root/reality-relay-bootstrap-clash.yaml
 ```
 
+完整路径总表见 [`docs/path-map.md`](docs/path-map.md)，里面按路径列出了用途、权限、敏感性和清理建议。
+
 ---
 
 
