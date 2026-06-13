@@ -2,7 +2,7 @@
 
 这是一套面向全新 Ubuntu/Debian VPS 的可复现部署脚本，目标是把 **SSH 安全初始化 + fail2ban + UFW + sing-box VLESS+Reality 多入口/多出口 + 客户端节点生成 + 回滚验证** 做成分阶段执行的项目，而不是一次性把服务器改到不可恢复状态。
 
-默认支持：Ubuntu 22.04、Ubuntu 24.04、Debian 13。其他系统会停止并提示。
+默认支持：Ubuntu 22.04、Ubuntu 24.04、Debian 10-13。其他系统会停止并提示。
 
 ## 设计原则
 

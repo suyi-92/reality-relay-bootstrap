@@ -1,7 +1,7 @@
 # reality-relay-bootstrap 完整使用手册
 
 > 适用项目：`reality-relay-bootstrap` 
-> 目标系统：Ubuntu 22.04 / Ubuntu 24.04 / Debian 13 
+> 目标系统：Ubuntu 22.04 / Ubuntu 24.04 / Debian 10-13
 > 核心目标：新 VPS 可复现部署、SSH 不锁机、fail2ban、UFW、sing-box VLESS+Reality 多入口多出口、客户端节点生成、验证与回滚。
 
 ---
@@ -677,7 +677,7 @@ sudo bash bootstrap.sh --phase preflight
 
 它会检查：
 
-- 当前系统是否是 Ubuntu 22.04 / Ubuntu 24.04 / Debian 13。
+- 当前系统是否是 Ubuntu 22.04 / Ubuntu 24.04 / Debian 10-13。
 - `config.env` 是否存在。
 - 关键变量是否合法。
 - SSH 配置和基础工具是否可用。

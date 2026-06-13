@@ -479,16 +479,17 @@ resolve_upstream_nodes_path() {
 }
 
 require_supported_os() {
-  [[ -r /etc/os-release ]] || die "无法读取 /etc/os-release"
+  local os_release="${RRB_OS_RELEASE_FILE:-/etc/os-release}"
+  [[ -r "$os_release" ]] || die "无法读取 $os_release"
   # shellcheck disable=SC1091
-  source /etc/os-release
+  source "$os_release"
   local os_id="${ID:-}" ver="${VERSION_ID:-}"
   case "$os_id:$ver" in
-    ubuntu:22.04|ubuntu:24.04|debian:13|debian:13.*)
+    ubuntu:22.04|ubuntu:24.04|debian:10|debian:10.*|debian:11|debian:11.*|debian:12|debian:12.*|debian:13|debian:13.*)
       info "系统受支持：$PRETTY_NAME"
       ;;
     *)
-      die "当前系统不在默认支持范围：${PRETTY_NAME:-unknown}。本项目优先支持 Ubuntu 22.04/24.04 和 Debian 13，为防锁机已停止。"
+      die "当前系统不在默认支持范围：${PRETTY_NAME:-unknown}。本项目优先支持 Ubuntu 22.04/24.04 和 Debian 10-13，为防锁机已停止。"
       ;;
   esac
 }
