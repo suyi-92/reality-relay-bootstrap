@@ -152,6 +152,10 @@ load_config() {
   : "${PROXY_PROTOCOL:=vless-reality}"
   : "${PROXY_IP_VERSION:=ipv4}"
   : "${MODE_443:=direct}"
+  if [[ "$MODE_443" != "direct" ]]; then
+    warn "MODE_443=$MODE_443 已废弃；当前固定按 direct 处理，不再生成域名/IP 分流规则。"
+    MODE_443="direct"
+  fi
   : "${DIRECT_PORT:=443}"
   : "${HOME_PORT_START:=51043}"
   : "${HOME_PORT_END:=65535}"
@@ -201,8 +205,6 @@ load_config() {
   : "${REALITY_HANDSHAKE_SERVER:=www.microsoft.com}"
   : "${REALITY_HANDSHAKE_PORT:=443}"
   : "${REALITY_MAX_TIME_DIFFERENCE:=1m}"
-  : "${SMART_AI_HOME_TAG:=}"
-  : "${REJECT_CN_PRIVATE:=true}"
   : "${CLIENT_FINGERPRINT:=chrome}"
   : "${CLIENT_UDP:=false}"
   : "${CLIENT_ALPN:=h2,http/1.1}"
@@ -404,7 +406,6 @@ validate_config_basics() {
   validate_bool CLOUDFLARE_ENSURE_DNS_RECORDS
   validate_bool CLOUDFLARE_DNS_OVERWRITE_EXISTING
   validate_bool CLOUDFLARE_REQUIRE_ACTIVE_ZONE
-  validate_bool REJECT_CN_PRIVATE
   validate_bool CLIENT_UDP
   validate_bool ENABLE_SUBSCRIPTION_SERVER
   validate_bool RESET_PROXY_KEYS
@@ -415,7 +416,7 @@ validate_config_basics() {
   validate_user_name SFTP_USER
   normalize_subscription_target "$SUBSCRIPTION_TARGET" >/dev/null || die "SUBSCRIPTION_TARGET 不支持：$SUBSCRIPTION_TARGET"
   (( HOME_PORT_START <= HOME_PORT_END )) || die "HOME_PORT_START 不能大于 HOME_PORT_END"
-  [[ "$MODE_443" == "direct" || "$MODE_443" == "smart" ]] || die "MODE_443 只能是 direct 或 smart"
+  [[ "$MODE_443" == "direct" ]] || die "MODE_443 当前只支持 direct"
   [[ "$INSTALL_SINGBOX_METHOD" == "apt" || "$INSTALL_SINGBOX_METHOD" == "233boy" ]] || die "INSTALL_SINGBOX_METHOD 只能是 apt 或 233boy"
   [[ "$PROXY_PROTOCOL" == "vless-reality" ]] || die "PROXY_PROTOCOL 当前只支持 vless-reality"
   [[ "$PROXY_IP_VERSION" == "ipv4" || "$PROXY_IP_VERSION" == "ipv6" || "$PROXY_IP_VERSION" == "dual" ]] || die "PROXY_IP_VERSION 只能是 ipv4、ipv6 或 dual"

@@ -43,58 +43,6 @@ REQUIRED_UPSTREAM_COLUMNS = {
 HOME_PROXY_TYPES = {"socks5", "socks", "http"}
 UPSTREAM_SCHEMES = {"vless"}
 
-AI_DOMAINS = [
-    "browser-intake-datadoghq.com",
-    "chat.openai.com.cdn.cloudflare.net",
-    "openai-api.arkoselabs.com",
-    "openaicom-api-bdcpf8c6d2e9atf6.z01.azurefd.net",
-    "openaicomproductionae4b.blob.core.windows.net",
-    "production-openaicom-storage.azureedge.net",
-    "static.cloudflareinsights.com",
-    "cdn.usefathom.com",
-    "ai.google.dev",
-    "alkalimakersuite-pa.clients6.google.com",
-    "generativelanguage.googleapis.com",
-    "makersuite.google.com",
-    "copilot.microsoft.com",
-]
-
-AI_DOMAIN_SUFFIXES = [
-    "perplexity.ai",
-    "pplx.ai",
-    "ai.com",
-    "chatgpt.com",
-    "chatgpt.livekit.cloud",
-    "oaistatic.com",
-    "oaiusercontent.com",
-    "openai.com",
-    "openaiapi-site.azureedge.net",
-    "openaicom.imgix.net",
-    "host.livekit.cloud",
-    "turn.livekit.cloud",
-    "anthropic.com",
-    "claude.ai",
-    "claude.com",
-    "bard.google.com",
-    "deepmind.com",
-    "deepmind.google",
-    "gemini.google.com",
-    "generativeai.google",
-    "proactivebackend-pa.googleapis.com",
-    "aisandbox-pa.googleapis.com",
-    "robinfrontend-pa.googleapis.com",
-    "x.ai",
-    "grok.com",
-    "chorus.sh",
-]
-
-AI_DOMAIN_KEYWORDS = ["openai"]
-
-AI_IP_CIDRS = [
-    "24.199.123.28/32",
-    "64.23.132.171/32",
-]
-
 SUBSCRIPTION_TARGETS = {"ClashMeta"}
 
 
@@ -192,8 +140,6 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
         "REALITY_HANDSHAKE_SERVER": "www.microsoft.com",
         "REALITY_HANDSHAKE_PORT": "443",
         "REALITY_MAX_TIME_DIFFERENCE": "1m",
-        "SMART_AI_HOME_TAG": "",
-        "REJECT_CN_PRIVATE": "true",
         "CLIENT_FINGERPRINT": "chrome",
         "CLIENT_UDP": "false",
         "CLIENT_ALPN": "h2,http/1.1",
@@ -209,6 +155,9 @@ def defaults(env: Dict[str, str]) -> Dict[str, str]:
     }
     for k, v in d.items():
         merged.setdefault(k, v)
+    if merged.get("MODE_443", "direct") != "direct":
+        print(f"WARN: MODE_443={merged.get('MODE_443')} 已废弃；当前固定按 direct 处理。", file=sys.stderr)
+        merged["MODE_443"] = "direct"
     server_ip = merged.get("SERVER_IP", "")
     if server_ip and ":" in server_ip and not merged.get("SERVER_IP_IPV6"):
         merged["SERVER_IP_IPV6"] = server_ip
@@ -363,8 +312,8 @@ def validate_env(env: Dict[str, str]) -> None:
         raise ConfigError("PROXY_PROTOCOL 当前只支持 vless-reality")
     if env["PROXY_IP_VERSION"] not in {"ipv4", "ipv6", "dual"}:
         raise ConfigError("PROXY_IP_VERSION 只能是 ipv4、ipv6 或 dual")
-    if env["MODE_443"] not in {"direct", "smart"}:
-        raise ConfigError("MODE_443 只能是 direct 或 smart")
+    if env["MODE_443"] != "direct":
+        raise ConfigError("MODE_443 当前只支持 direct")
     if not env["SERVER_ALIAS"].strip():
         raise ConfigError("SERVER_ALIAS 不能为空；它会作为 443 节点名称")
     if env["INSTALL_SINGBOX_METHOD"] not in {"apt", "233boy"}:
@@ -386,7 +335,6 @@ def validate_env(env: Dict[str, str]) -> None:
         "CLOUDFLARE_ENSURE_DNS_RECORDS",
         "CLOUDFLARE_DNS_OVERWRITE_EXISTING",
         "CLOUDFLARE_REQUIRE_ACTIVE_ZONE",
-        "REJECT_CN_PRIVATE",
         "CLIENT_UDP",
         "ENABLE_SUBSCRIPTION_SERVER",
         "RESET_PROXY_KEYS",
@@ -729,8 +677,6 @@ def load_home_rows(
             }
         )
 
-    if env["MODE_443"] == "smart" and not rows:
-        raise ConfigError("MODE_443=smart 需要至少一行家宽代理，用于 AI 域名出口。")
     if not rows and not allow_empty:
         raise ConfigError("home-proxies.csv 没有任何家宽代理行。")
     return rows
@@ -815,8 +761,6 @@ def load_rows(env: Dict[str, str], base: Path, allow_empty: bool = True) -> List
     used_ports: set[int] = {direct_port}
     rows = load_home_rows(env, base, used_tags, used_ports, allow_empty=True)
     rows.extend(load_upstream_rows(env, base, used_tags, used_ports))
-    if env["MODE_443"] == "smart" and not any(row.get("source") == "home" for row in rows):
-        raise ConfigError("MODE_443=smart 需要至少一行家宽代理，用于 AI 域名出口。")
     if not rows and not allow_empty:
         raise ConfigError("没有任何家宽代理或上游节点行。")
     return rows
@@ -922,21 +866,6 @@ def build_home_outbound(row: Dict[str, Any]) -> Dict[str, Any]:
     return outbound
 
 
-def select_ai_outbound(env: Dict[str, str], rows: List[Dict[str, Any]]) -> Tuple[str, str]:
-    home_rows = [row for row in rows if row.get("source") == "home"]
-    requested = env.get("SMART_AI_HOME_TAG", "").strip()
-    if requested:
-        for row in home_rows:
-            if row["tag"] == requested:
-                return f"out-{row['tag']}", row["tag"]
-        available = ", ".join(row["tag"] for row in home_rows)
-        raise ConfigError(f"SMART_AI_HOME_TAG={requested} 不存在；可用 tag：{available}")
-    if home_rows:
-        first = home_rows[0]
-        return f"out-{first['tag']}", first["tag"]
-    return "direct", "direct"
-
-
 def dns_strategy(env: Dict[str, str]) -> str:
     strategies = {
         "ipv4": "ipv4_only",
@@ -948,7 +877,7 @@ def dns_strategy(env: Dict[str, str]) -> str:
 
 def build_config(env: Dict[str, str], rows: List[Dict[str, Any]], uuid: str, private_key: str, short_id: str) -> Dict[str, Any]:
     direct_port = as_port(env, "DIRECT_PORT")
-    direct_inbound_tag = "vless-direct-443" if env["MODE_443"] == "direct" else "vless-smart-443"
+    direct_inbound_tag = "vless-direct-443"
 
     inbounds = [build_vless_reality_inbound(direct_inbound_tag, direct_port, uuid, private_key, short_id, env)]
     for row in rows:
@@ -960,36 +889,8 @@ def build_config(env: Dict[str, str], rows: List[Dict[str, Any]], uuid: str, pri
     outbounds.append({"type": "block", "tag": "block"})
 
     route_rules: List[Dict[str, Any]] = [
-        {"action": "sniff", "timeout": "1s"},
-        {"protocol": "dns", "action": "hijack-dns"},
+        {"inbound": direct_inbound_tag, "action": "route", "outbound": "direct"},
     ]
-
-    if env["MODE_443"] == "direct":
-        route_rules.append({"inbound": direct_inbound_tag, "action": "route", "outbound": "direct"})
-
-    if as_bool(env, "REJECT_CN_PRIVATE"):
-        route_rules.extend(
-            [
-                {"ip_is_private": True, "action": "reject"},
-                {"rule_set": ["geosite-cn", "geoip-cn"], "action": "reject"},
-            ]
-        )
-
-    if env["MODE_443"] == "smart":
-        ai_outbound_tag, _ = select_ai_outbound(env, rows)
-        route_rules.append(
-            {
-                "inbound": direct_inbound_tag,
-                "domain": AI_DOMAINS,
-                "domain_suffix": AI_DOMAIN_SUFFIXES,
-                "domain_keyword": AI_DOMAIN_KEYWORDS,
-                "ip_cidr": AI_IP_CIDRS,
-                "action": "route",
-                "outbound": ai_outbound_tag,
-            }
-        )
-        route_rules.append({"inbound": direct_inbound_tag, "action": "route", "outbound": "direct"})
-
     for row in rows:
         route_rules.append({"inbound": f"vless-{row['tag']}", "action": "route", "outbound": f"out-{row['tag']}"})
 
@@ -1022,24 +923,6 @@ def build_config(env: Dict[str, str], rows: List[Dict[str, Any]], uuid: str, pri
             "auto_detect_interface": True,
             "default_domain_resolver": "dns-cloudflare",
             "rules": route_rules,
-            "rule_set": [
-                {
-                    "type": "remote",
-                    "tag": "geosite-cn",
-                    "format": "binary",
-                    "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs",
-                    "download_detour": "direct",
-                    "update_interval": "24h",
-                },
-                {
-                    "type": "remote",
-                    "tag": "geoip-cn",
-                    "format": "binary",
-                    "url": "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs",
-                    "download_detour": "direct",
-                    "update_interval": "24h",
-                },
-            ],
             "final": "block",
         },
         "experimental": {"cache_file": {"enabled": True}},
@@ -1055,7 +938,7 @@ def port_list(env: Dict[str, str], rows: List[Dict[str, Any]]) -> List[int]:
 def node_list(env: Dict[str, str], rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     direct_port = as_port(env, "DIRECT_PORT")
     direct_name = env["SERVER_ALIAS"]
-    nodes = [{"name": direct_name, "port": direct_port, "kind": env["MODE_443"]}]
+    nodes = [{"name": direct_name, "port": direct_port, "kind": "direct"}]
     for row in rows:
         nodes.append(
             {
@@ -1072,14 +955,11 @@ def print_summary(env: Dict[str, str], rows: List[Dict[str, Any]]) -> None:
     print("配置检查通过。")
     print("入站协议：VLESS + Reality")
     print(f"代理 IP 版本：{env['PROXY_IP_VERSION']}（DNS strategy: {dns_strategy(env)}）")
-    print(f"443 模式：{env['MODE_443']}，端口：{env['DIRECT_PORT']}")
+    print(f"443 出口：direct，端口：{env['DIRECT_PORT']}")
     print(f"Reality server_name：{env['REALITY_SERVER_NAME']}")
     print(f"Reality handshake：{env['REALITY_HANDSHAKE_SERVER']}:{env['REALITY_HANDSHAKE_PORT']}")
     if custom_domain_enabled(env):
         print(f"自有域名：{env['CUSTOM_DOMAIN']}（Cloudflare zone: {env['CLOUDFLARE_ZONE_NAME']}；DNS 灰云；Nginx fallback {env['NGINX_FALLBACK_HOST']}:{env['NGINX_FALLBACK_PORT']}）")
-    if env["MODE_443"] == "smart":
-        outbound, tag = select_ai_outbound(env, rows)
-        print(f"Smart 443 AI 出口：{tag} ({outbound})")
     print("将开放端口：" + ", ".join(str(p) for p in port_list(env, rows)))
     home_rows = [row for row in rows if row.get("source") == "home"]
     upstream_rows = [row for row in rows if row.get("source") == "upstream"]

@@ -201,14 +201,7 @@ Cloudflare API Token 至少需要对应 zone 的 DNS 编辑权限；如果要让
 MODE_443="direct"
 ```
 
-表示 443 永远走中转机自身公网出口。
-
-```bash
-MODE_443="smart"
-SMART_AI_HOME_TAG=""
-```
-
-表示 443 入口中，AI 域名走指定家宽出口；`SMART_AI_HOME_TAG` 为空时使用 CSV 第一行家宽出口，非 AI 国外流量走中转机自身出口，国内/私有地址 reject。
+表示 443 永远走中转机自身公网出口。脚本不再生成 AI 域名、CN/private 或其它目标域名/IP 分流规则；每个家宽或上游节点端口都固定走对应出口。
 
 ## home-proxies.csv
 

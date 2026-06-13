@@ -289,9 +289,6 @@ REALITY_HANDSHAKE_SERVER="www.microsoft.com"
 REALITY_HANDSHAKE_PORT="443"
 REALITY_MAX_TIME_DIFFERENCE="1m"
 
-SMART_AI_HOME_TAG=""
-REJECT_CN_PRIVATE="true"
-
 CLIENT_FINGERPRINT="chrome"
 CLIENT_UDP="false"
 CLIENT_ALPN="h2,http/1.1"
@@ -302,7 +299,7 @@ CLASH_MIXED_PORT="7890"
 
 | 变量 | 说明 | 示例 |
 |---|---|---|
-| `SERVER_ALIAS` | 服务器别名；会作为 443/direct 或 443/smart 节点名称 | `my-vps` |
+| `SERVER_ALIAS` | 服务器别名；会作为 443 节点名称 | `my-vps` |
 | `SERVER_IP` | 兼容字段；默认写入 IPv4，IPv4 为空时写入 IPv6 | `1.2.3.4` |
 | `SERVER_IP_IPV4` | 服务器公网 IPv4 | `1.2.3.4` |
 | `SERVER_IP_IPV6` | 服务器公网 IPv6，可为空 | `2001:db8::1` |
@@ -383,9 +380,7 @@ sudo CONFIRM_USE_233BOY_INSTALLER=yes bash bootstrap.sh --phase singbox
 /etc/sing-box/config.json
 ```
 
-### 5.4 443 模式
-
-#### 模式一：`MODE_443=direct`
+### 5.4 443 出口
 
 ```bash
 MODE_443="direct"
@@ -404,35 +399,7 @@ DIRECT_PORT="443"
 my-vps
 ```
 
-#### 模式二：`MODE_443=smart`
-
-```bash
-MODE_443="smart"
-SMART_AI_HOME_TAG=""
-```
-
-含义：
-
-```text
-客户端 -> VPS:443
-  AI 域名       -> 指定家宽出口
-  非 AI 国外流量 -> VPS 自身公网出口
-  国内/私有地址  -> reject
-```
-
-`SMART_AI_HOME_TAG` 为空时，AI 流量走 CSV 第一行家宽出口。
-
-如果你想指定某个家宽出口，例如 CSV 里有：
-
-```csv
-home-us,51043,socks5,proxy.example.com,1080,user,password,tcp
-```
-
-则可以写：
-
-```bash
-SMART_AI_HOME_TAG="home-us"
-```
+脚本不再生成 AI 域名、CN/private 或其它目标域名/IP 分流规则。443 固定走 VPS 自身 direct 出口；`home-proxies.csv` 和 `upstream-nodes.txt` 生成的每个专用端口固定走对应出口。
 
 ### 5.5 端口范围变量
 
@@ -952,34 +919,12 @@ sudo bash bootstrap.sh --phase validate
 
 ## 10. 生成的 sing-box 结构
 
-### 10.1 direct 模式
+### 10.1 固定端口映射
 
-`MODE_443=direct` 时：
+生成后的流量路径：
 
 ```text
 客户端 -> VPS:443   -> VPS 自身公网出口
-客户端 -> VPS:51043 -> 家宽代理 home-01
-客户端 -> VPS:51044 -> 家宽代理 home-02
-```
-
-节点示例：
-
-```text
-my-vps
-home-01
-home-02
-```
-
-### 10.2 smart 模式
-
-`MODE_443=smart` 时：
-
-```text
-客户端 -> VPS:443
-  AI 域名       -> SMART_AI_HOME_TAG 指定家宽；为空则 CSV 第一行
-  非 AI 国外流量 -> VPS 自身公网出口
-  国内/私有地址  -> reject
-
 客户端 -> VPS:51043 -> 家宽代理 home-01
 客户端 -> VPS:51044 -> 家宽代理 home-02
 ```
@@ -1433,19 +1378,7 @@ sudo grep -n 'vless-' /etc/sing-box/config.json
 sudo grep -n 'out-home' /etc/sing-box/config.json
 ```
 
-### 19.9 smart 模式 AI 没走家宽
-
-确认：
-
-```bash
-grep SMART_AI_HOME_TAG config.env
-```
-
-如果为空，AI 走 CSV 第一行。
-
-如果你指定了 tag，必须和 CSV 的 `tag` 完全一致。
-
-然后重新生成：
+如果某个专用端口出口不对，优先确认该端口对应的 `home-proxies.csv` 或 `upstream-nodes.txt` 行，然后重新生成并验证：
 
 ```bash
 sudo bash bootstrap.sh --phase singbox

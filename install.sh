@@ -361,9 +361,6 @@ REALITY_HANDSHAKE_SERVER=$(shell_quote "$reality_handshake_server")
 REALITY_HANDSHAKE_PORT=$(shell_quote "$reality_handshake_port")
 REALITY_MAX_TIME_DIFFERENCE="1m"
 
-SMART_AI_HOME_TAG=""
-REJECT_CN_PRIVATE="true"
-
 CLIENT_FINGERPRINT="chrome"
 CLIENT_UDP="false"
 CLIENT_ALPN="h2,http/1.1"
