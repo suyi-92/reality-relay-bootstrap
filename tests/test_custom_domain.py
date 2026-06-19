@@ -137,6 +137,7 @@ class CustomDomainConfigTest(unittest.TestCase):
         self.assertEqual(payload["content"], "203.0.113.10")
         self.assertIs(payload["proxied"], False)
         self.assertEqual(payload["ttl"], 1)
+        self.assertEqual(payload["comment"], "edge")
 
 
 if __name__ == "__main__":

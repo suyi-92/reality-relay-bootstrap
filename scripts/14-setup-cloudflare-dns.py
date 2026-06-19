@@ -118,7 +118,7 @@ def record_payload(env: Dict[str, str], record_type: str, content: str) -> Dict[
         "content": content,
         "ttl": int(env["CLOUDFLARE_DNS_TTL"]),
         "proxied": False,
-        "comment": "Managed by reality-relay-bootstrap",
+        "comment": env["SERVER_ALIAS"],
     }
 
 
