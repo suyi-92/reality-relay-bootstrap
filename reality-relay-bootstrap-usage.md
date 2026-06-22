@@ -86,7 +86,7 @@ sudo bash install.sh
 | `CLOUDFLARE_ZONE_NAME` | 自动按域名后两段推断 | Cloudflare zone 名；如 `edge.example.com` 对应 `example.com` |
 | `LE_EMAIL` | 空 | Let's Encrypt 注册邮箱；启用自有域名时必填 |
 | `CLOUDFLARE_API_TOKEN` | 空 | Cloudflare DNS API Token；用于 DNS-01 申请证书 |
-| `RESET_PROXY_KEYS` | `false` | 是否重置 VLESS UUID、Reality keypair 和 short-id |
+| `RESET_PROXY_KEYS` | `false` | 是否重置 VLESS UUID、Reality keypair 和 short-id；修改家宽/上游落地节点时保持 `false` |
 | `ENABLE_SUBSCRIPTION_SERVER` | `true` | 是否开启简单订阅端口 |
 | `SUBSCRIPTION_PORT` | 自有域名时默认空；非自有域名默认 `51040` | 可选公网直连订阅端口；自有域名留空时只显示域名订阅 |
 | `SUBSCRIPTION_INTERNAL_PORT` | `51040` | 订阅服务本机监听端口，供 Nginx fallback 反代 |
@@ -447,7 +447,7 @@ REALITY_MAX_TIME_DIFFERENCE="1m"
 | `ipv6` | 只走 IPv6 |
 | `dual` | IPv4/IPv6 双栈，优先 IPv4 |
 
-`RESET_PROXY_KEYS=false` 时重复运行 `singbox` 或一键安装不会轮换 VLESS UUID、Reality keypair 和 short-id；改成 `true` 会生成新密钥，旧节点和旧订阅 token 会失效。
+`RESET_PROXY_KEYS=false` 时重复运行 `singbox` 或一键安装不会轮换 VLESS UUID、Reality keypair 和 short-id；一键安装重跑时会优先继承旧 `config.env` 的值，找不到旧值时默认 `false`。修改家宽/上游落地节点时通常保持 `false`；改成 `true` 会生成新密钥，旧节点和旧订阅 token 会失效。
 
 首次执行 `singbox` 阶段时会自动生成：
 
@@ -1113,6 +1113,7 @@ sudo ufw delete 编号
 ## 16. 更换 VLESS UUID 或 Reality key
 
 一般不建议频繁更换。更换后所有客户端节点都要重新导入。
+如果只是修改家宽/上游落地节点，不要打开这个开关，保持 `RESET_PROXY_KEYS=false` 即可。
 
 一键安装或 `config.env` 推荐用统一开关：
 

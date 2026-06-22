@@ -142,6 +142,30 @@ shell_quote() {
   printf '%q' "$1"
 }
 
+config_env_value() {
+  local config_file="$1" key="$2" fallback="$3" raw value
+  if [[ ! -f "$config_file" ]]; then
+    printf '%s\n' "$fallback"
+    return 0
+  fi
+  raw="$(awk -v key="$key" '
+    $0 ~ "^[[:space:]]*(export[[:space:]]+)?" key "[[:space:]]*=" {
+      sub(/^[[:space:]]*(export[[:space:]]+)?[^=]+=/, "")
+      print
+      exit
+    }
+  ' "$config_file")"
+  if [[ -z "$raw" ]]; then
+    printf '%s\n' "$fallback"
+    return 0
+  fi
+  value="$(printf '%s' "$raw" | sed -E "s/[[:space:]]+#.*$//; s/^[[:space:]]+//; s/[[:space:]]+$//; s/^[\"']//; s/[\"']$//")"
+  case "$value" in
+    true|false) printf '%s\n' "$value" ;;
+    *) printf '%s\n' "$fallback" ;;
+  esac
+}
+
 csv_escape() {
   local value="$1"
   if [[ "$value" == *","* || "$value" == *"\""* || "$value" == *$'\n'* ]]; then
@@ -618,7 +642,8 @@ main() {
 
   line
   printf '%b\n' "${CYAN}${BOLD}基础信息${RESET}"
-  local server_alias server_ip_ipv4 server_ip_ipv6 ssh_port admin_pubkey direct_port enable_subscription_server subscription_port subscription_target reset_proxy_keys home_port_start home_port_end enable_custom_domain custom_domain cloudflare_zone_name le_email cloudflare_api_token nginx_fallback_port
+  local server_alias server_ip_ipv4 server_ip_ipv6 ssh_port admin_pubkey direct_port enable_subscription_server subscription_port subscription_target reset_proxy_keys reset_proxy_keys_default home_port_start home_port_end enable_custom_domain custom_domain cloudflare_zone_name le_email cloudflare_api_token nginx_fallback_port
+  reset_proxy_keys_default="$(config_env_value "$project_dir/config.env" "RESET_PROXY_KEYS" "false")"
   server_alias="$(read_default "SERVER_ALIAS" "")"
   server_ip_ipv4="$(read_default "SERVER_IP_IPv4" "$default_ip")"
   server_ip_ipv6="$(read_default "SERVER_IP_IPv6" "")"
@@ -649,7 +674,8 @@ main() {
 
   line
   printf '%b\n' "${CYAN}${BOLD}节点订阅配置${RESET}"
-  reset_proxy_keys="$(read_bool_value "RESET_PROXY_KEYS" "true")"
+  printf '%b\n' "${DIM}RESET_PROXY_KEYS=false 会保留现有 VLESS UUID、Reality keypair 和 short-id；修改落地机时通常保持 false。只有需要作废旧节点时才设为 true。${RESET}"
+  reset_proxy_keys="$(read_bool_value "RESET_PROXY_KEYS" "$reset_proxy_keys_default")"
   enable_subscription_server="$(read_bool_value "ENABLE_SUBSCRIPTION_SERVER" "true")"
   subscription_port=""
   subscription_target="ClashMeta"

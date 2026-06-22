@@ -146,7 +146,7 @@ CLIENT_ALPN="h2,http/1.1"
 ```
 
 `PROXY_IP_VERSION` 可选 `ipv4`、`ipv6`、`dual`；默认 `ipv4`。`dual` 表示双栈可用并优先 IPv4。
-`RESET_PROXY_KEYS=false` 时重复运行不会轮换 VLESS UUID、Reality keypair 和 short-id；改为 `true` 会生成新密钥，旧节点和旧订阅 token 会失效。
+`RESET_PROXY_KEYS=false` 时重复运行不会轮换 VLESS UUID、Reality keypair 和 short-id；一键安装重跑时会优先继承旧 `config.env` 的值，找不到旧值时默认 `false`。修改家宽/上游落地节点时通常保持 `false`；改为 `true` 会生成新密钥，旧节点和旧订阅 token 会失效。
 
 首次执行 `--phase singbox` 会自动生成：
 
