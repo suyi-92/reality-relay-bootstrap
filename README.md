@@ -51,6 +51,7 @@ reality-relay-bootstrap/
   docs/
     install-flow.md
     cloudflare-domain-preflight.md
+    path-map.md
     recovery.md
     client-setup.md
 ```
@@ -60,7 +61,7 @@ reality-relay-bootstrap/
 更详细的参数解释、Windows PowerShell 示例、回滚和客户端导入说明，请阅读 [`reality-relay-bootstrap-usage.md`](./reality-relay-bootstrap-usage.md)。
 全新域名第一次托管到 Cloudflare 时，先看 [`docs/cloudflare-domain-preflight.md`](./docs/cloudflare-domain-preflight.md)。
 
-如果是在全新 VPS 上使用推荐默认值部署，可以直接运行一键安装脚本。脚本会自动拉取/定位项目、生成 `config.env`、`home-proxies.csv` 和 `upstream-nodes.txt`，会提示填写服务器 IPv4/IPv6、SSH、入口端口、自有域名、节点订阅配置、root 公钥、家宽代理 CSV 以及可选上游节点：
+如果是在全新 VPS 上使用推荐默认值部署，可以直接运行一键安装脚本。脚本会自动拉取/定位项目、生成 `config.env`、`home-proxies.csv` 和 `upstream-nodes.txt`，会提示填写服务器 IPv4/IPv6、SSH、入口端口、自有域名、节点订阅配置、root 公钥、家宽代理 CSV 以及可选上游节点。重跑一键脚本时，`RESET_PROXY_KEYS` 默认继承旧 `config.env`，找不到旧值时才使用 `false`，避免修改落地节点时误重置中转机节点身份：
 
 ```bash
 bash <(wget -qO- https://raw.githubusercontent.com/suyi-92/reality-relay-bootstrap/main/install.sh)
@@ -104,21 +105,22 @@ sudo bash bootstrap.sh --phase singbox --dry-run
 sudo bash bootstrap.sh --phase firewall --dry-run
 ```
 
-## config.env 必填项
+## config.env 基础项
 
 ```bash
 SERVER_ALIAS="my-vps"
-SERVER_IP="你的服务器公网IP"
+SERVER_IP=""
 SERVER_IP_IPV4="你的服务器公网IPv4"
 SERVER_IP_IPV6=""
 SSH_PORT="22"
-ADMIN_USER="root"
 ADMIN_PUBKEY="ssh-ed25519 AAAA... 你的本地公钥"
 # 多个公钥可写成逐行内容，例如：
 # ADMIN_PUBKEY=$'ssh-ed25519 AAAA... user1\nssh-ed25519 BBBB... user2'
 # 或把额外公钥写入 ADMIN_PUBKEYS。
 MODE_443="direct"
 ```
+
+新配置推荐填写 `SERVER_IP_IPV4` 和/或 `SERVER_IP_IPV6`；`SERVER_IP` 仍保留为旧配置兼容字段，脚本会自动把它归并到对应的 IPv4/IPv6 字段。当前管理用户固定为 root，非 root 的 `ADMIN_USER` 会被警告并按 root 处理。
 
 如果 root 已经有正确公钥，`ADMIN_PUBKEY` 可以留空，脚本会复用 `/root/.ssh/authorized_keys`。分步骤运行时，`ADMIN_PUBKEY` 支持用 `$'key1\nkey2'` 写多个公钥，也可以把额外公钥逐行写入 `ADMIN_PUBKEYS`；一键脚本会逐条提示添加多个 `ADMIN_PUBKEY`。
 
@@ -182,7 +184,7 @@ NGINX_FALLBACK_PORT="8443"
 Cloudflare 侧分两类：
 
 - 必须手动完成：在 Cloudflare 添加/托管 zone，并到域名注册商把 NS 改成 Cloudflare 分配的 nameserver，等待 zone active。
-- 脚本自动完成：用 API token 创建或更新 `CUSTOM_DOMAIN` 的 A/AAAA 记录，`proxied=false`，也就是灰云 / DNS only；默认要求 zone 已经 active，避免后续 Let’s Encrypt DNS-01 失败。
+- 脚本自动完成：用 API token 创建或更新 `CUSTOM_DOMAIN` 的 A/AAAA 记录，`proxied=false`，也就是灰云 / DNS only；记录注释会直接写当前 `SERVER_ALIAS`；默认要求 zone 已经 active，避免后续 Let’s Encrypt DNS-01 失败。
 
 启用后：
 
@@ -245,11 +247,11 @@ sudo CONFIRM_ROOT_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final
 
 sudo bash bootstrap.sh --phase fail2ban
 sudo bash bootstrap.sh --phase singbox
-sudo bash bootstrap.sh --phase cloudflare-dns  # 可选预处理；singbox/custom-domain phase 也会自动调用
-sudo bash bootstrap.sh --phase custom-domain   # 仅 ENABLE_CUSTOM_DOMAIN=true 时需要；singbox phase 也会自动调用
 sudo bash bootstrap.sh --phase firewall
 sudo bash bootstrap.sh --phase validate
 ```
+
+当前 `singbox` 阶段会安装/确认 sing-box、准备 VLESS UUID/Reality keypair/short-id、生成 `/etc/sing-box/config.json`、重启并做 sing-box-only 验证，同时刷新订阅服务，并在 `ENABLE_CUSTOM_DOMAIN=true` 时自动执行 Cloudflare DNS 和 Nginx fallback 配置。`cloudflare-dns`、`custom-domain`、`subscription` 仍可作为独立阶段单独重跑。
 
 ## SSH 二阶段说明
 
@@ -281,6 +283,8 @@ sudo CONFIRM_ROOT_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final
 sudo bash bootstrap.sh --phase singbox
 ```
 
+该阶段会把 `home-proxies.csv` 和 `upstream-nodes.txt` 复制到 `RRB_STATE_DIR`，然后按最新文件重新生成 sing-box 多入口配置。只要 `RESET_PROXY_KEYS=false`，已有 VLESS UUID、Reality keypair 和 short-id 会继续复用；只有显式设为 `true` 时才删除并重建这些密钥材料。
+
 可选使用 233boy 作为 core/管理工具基础：
 
 ```bash
@@ -293,13 +297,50 @@ sudo CONFIRM_USE_233BOY_INSTALLER=yes bash bootstrap.sh --phase singbox
 
 ## 新增/删除出口
 
-新增家宽 HTTP/SOCKS 出口时编辑 `home-proxies.csv`；新增上游节点出口时编辑 `upstream-nodes.txt`。改完后执行：
+新增家宽 HTTP/SOCKS 出口时编辑 `home-proxies.csv`；新增上游节点出口时编辑 `upstream-nodes.txt`。改落地节点通常不需要重置中转节点身份，请保持 `RESET_PROXY_KEYS=false`。改完后执行：
 
 ```bash
 sudo bash bootstrap.sh --phase singbox
 sudo bash bootstrap.sh --phase firewall
 sudo bash bootstrap.sh --phase validate
 ```
+
+### 添加落地机并保留节点订阅不变
+
+这里的“订阅不变”指订阅 URL token、VLESS UUID、Reality public key、short-id 以及已有节点的名称/端口不变；订阅内容会多出新添加的落地节点。按下面做，旧客户端节点不会因为添加落地机而失效：
+
+1. 确认 `config.env` 中保持：
+
+```bash
+RESET_PROXY_KEYS="false"
+```
+
+2. 追加新的落地机行，不要改已有行的 `tag` 和 `listen_port`。如果已有节点的 `listen_port` 是自动分配的空值，建议先把当前已使用端口写死，再追加新行，避免以后重排或删除行时端口漂移。
+
+```csv
+# home-proxies.csv
+tag,type,server,server_port,username,password,network,listen_port
+home-01,socks5,proxy1.example.com,1080,user1,password1,tcp,51043
+home-02,socks5,proxy2.example.com,1080,user2,password2,tcp,51044
+```
+
+或者追加上游 VLESS 落地节点：
+
+```csv
+# upstream-nodes.txt
+tag,node_url,listen_port
+relay-01,vless://uuid@example.com:443?encryption=none&security=reality&type=tcp&pbk=PUBLIC_KEY#relay-01,51045
+```
+
+3. 重新生成配置、刷新订阅和防火墙：
+
+```bash
+sudo bash bootstrap.sh --phase singbox
+sudo bash bootstrap.sh --phase firewall
+sudo bash bootstrap.sh --phase validate
+```
+
+不要为了添加落地机去删除 `/etc/reality-relay-bootstrap/vless-uuid.txt`、Reality key 文件或 short-id 文件，也不要把 `RESET_PROXY_KEYS` 改成 `true`。否则订阅 token 和旧节点都会变化，客户端需要重新导入。
 
 删除：从 CSV 删除对应行，再执行同样命令。`firewall` 阶段会自动清理带 `reality-relay-bootstrap` 注释且不再使用的本项目 UFW 规则，不会碰你手工添加的其它规则。
 
@@ -346,6 +387,8 @@ sudo bash bootstrap.sh --phase output-nodes
 sudo cat /root/reality-relay-bootstrap-nodes.txt
 sudo cat /root/reality-relay-bootstrap-clash.yaml
 ```
+
+`output-nodes` 阶段只在 `/root` 额外生成可复制的节点文本和 Mihomo/Clash YAML；如果订阅服务已启用，它也会顺手刷新订阅目录和 systemd 服务。
 
 输出节点包括：
 
