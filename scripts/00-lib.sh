@@ -206,7 +206,7 @@ load_config() {
   : "${REALITY_HANDSHAKE_PORT:=443}"
   : "${REALITY_MAX_TIME_DIFFERENCE:=1m}"
   : "${CLIENT_FINGERPRINT:=chrome}"
-  : "${CLIENT_UDP:=false}"
+  : "${CLIENT_UDP:=true}"
   : "${CLIENT_ALPN:=h2,http/1.1}"
   : "${CLASH_MIXED_PORT:=7890}"
   : "${ENABLE_SUBSCRIPTION_SERVER:=true}"

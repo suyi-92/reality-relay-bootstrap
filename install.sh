@@ -386,7 +386,7 @@ REALITY_HANDSHAKE_PORT=$(shell_quote "$reality_handshake_port")
 REALITY_MAX_TIME_DIFFERENCE="1m"
 
 CLIENT_FINGERPRINT="chrome"
-CLIENT_UDP="false"
+CLIENT_UDP="true"
 CLIENT_ALPN="h2,http/1.1"
 CLASH_MIXED_PORT="7890"
 

@@ -290,7 +290,7 @@ REALITY_HANDSHAKE_PORT="443"
 REALITY_MAX_TIME_DIFFERENCE="1m"
 
 CLIENT_FINGERPRINT="chrome"
-CLIENT_UDP="false"
+CLIENT_UDP="true"
 CLIENT_ALPN="h2,http/1.1"
 CLASH_MIXED_PORT="7890"
 ```
@@ -487,12 +487,12 @@ Cloudflare 侧需要先在控制台添加/托管 zone，并到域名注册商把
 
 ```bash
 CLIENT_FINGERPRINT="chrome"
-CLIENT_UDP="false"
+CLIENT_UDP="true"
 CLIENT_ALPN="h2,http/1.1"
 CLASH_MIXED_PORT="7890"
 ```
 
-默认关闭 UDP，更稳。HTTP 家宽代理通常不适合 UDP，SOCKS5 也不一定支持 UDP。建议先 TCP 跑通后，再考虑是否开启 UDP。
+默认开启 UDP。HTTP 家宽代理通常不支持 UDP，SOCKS5 也不一定支持 UDP；如果对应出口不支持 UDP，可显式设置 `CLIENT_UDP=false`。
 
 ### 5.8 保存关闭并检查
 
@@ -956,7 +956,7 @@ proxies:
     tls: true
     servername: "www.microsoft.com"
     client-fingerprint: "chrome"
-    udp: false
+    udp: true
     reality-opts:
       public-key: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
       short-id: "xxxxxxxxxxxxxxxx"

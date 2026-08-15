@@ -17,7 +17,7 @@ proxies:
     tls: true
     servername: www.microsoft.com
     client-fingerprint: chrome
-    udp: false
+    udp: true
     reality-opts:
       public-key: YOUR_REALITY_PUBLIC_KEY
       short-id: YOUR_REALITY_SHORT_ID

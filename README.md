@@ -143,7 +143,7 @@ REALITY_HANDSHAKE_SERVER="www.microsoft.com"
 REALITY_HANDSHAKE_PORT="443"
 REALITY_MAX_TIME_DIFFERENCE="1m"
 CLIENT_FINGERPRINT="chrome"
-CLIENT_UDP="false"
+CLIENT_UDP="true"
 CLIENT_ALPN="h2,http/1.1"
 ```
 
@@ -408,7 +408,7 @@ flow: xtls-rprx-vision
 tls: true
 servername: www.microsoft.com
 client-fingerprint: chrome
-udp: false
+udp: true
 reality-opts:
   public-key: "..."
   short-id: "..."

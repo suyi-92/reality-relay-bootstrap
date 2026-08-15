@@ -66,7 +66,7 @@ flow: xtls-rprx-vision
 tls: true
 servername: www.microsoft.com
 client-fingerprint: chrome
-udp: false
+udp: true
 reality-opts:
   public-key: "自动生成的 Reality public key"
   short-id: "自动生成的 short-id"
@@ -110,4 +110,4 @@ curl.exe -x http://127.0.0.1:7890 https://ifconfig.me
 1. 端口不通：检查服务商安全组、UFW、sing-box 监听。
 2. 只有某个家宽节点失败：先在服务器执行 `validate`，看该家宽代理本身是否可用。
 3. VLESS+Reality 握手失败：确认客户端 `servername`、`public-key`、`short-id`、`uuid` 与服务端输出一致。
-4. HTTP 家宽代理不支持 UDP：默认 `CLIENT_UDP=false`，先用 TCP 跑通。
+4. HTTP 家宽代理通常不支持 UDP：默认 `CLIENT_UDP=true`；如果对应出口不支持 UDP，可显式改为 `CLIENT_UDP=false`。
