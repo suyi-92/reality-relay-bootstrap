@@ -73,6 +73,31 @@ bash <(wget -qO- https://raw.githubusercontent.com/suyi-92/reality-relay-bootstr
 sudo bash install.sh
 ```
 
+已经完成部署、现在只想补一套 IPv6 字面量的本地 VLESS 节点时，使用 `-6` 维护模式。地址可自动探测后确认，也可以直接传入：
+
+```bash
+sudo bash install.sh -6
+sudo bash install.sh -6 2001:db8::10
+```
+
+远程一键脚本同样可以接收该选项：
+
+```bash
+bash <(wget -qO- https://raw.githubusercontent.com/suyi-92/reality-relay-bootstrap/main/install.sh) -6 2001:db8::10
+```
+
+`-6` 要求 `/opt/reality-relay-bootstrap/config.env`（或 `RRB_INSTALL_DIR` 指定目录）以及现有 sing-box、VLESS UUID、Reality keypair、short-id 都已经就绪。它不会重跑 SSH 初始化，也不会轮换身份材料；只设置 `SERVER_IP_IPV6`、`ENABLE_IPV6_LISTEN=true`、`CLIENT_UDP=true` 和 `RESET_PROXY_KEYS=false`，保留原有 `PROXY_IP_VERSION` 出口/DNS 策略，然后同步 UFW v6 规则、重启并验证 sing-box 的 IPv4/IPv6 监听。
+
+成功后生成三份仅含 IPv6 地址的 600 权限本地文件：
+
+```text
+/root/reality-relay-bootstrap-v6-vless.txt
+/root/reality-relay-bootstrap-v6-nodes.txt
+/root/reality-relay-bootstrap-v6-clash.yaml
+```
+
+其中 VLESS 分享链接会正确使用 `[IPv6]` authority；Mihomo/Clash 显式包含 `ipv6: true`、`type: vless`、`network: tcp` 和 `udp: true`。VLESS UDP 流量封装在 TCP/Reality 入口内，不需要开放同号 UDP 端口。仍需在云厂商 IPv6 安全组中放行实际使用的 VLESS TCP 端口。该模式只生成本地 v6 文件，不主动改动现有订阅服务。
+
 一键脚本仍然保留 SSH 二阶段安全确认：完成 `ssh-phase1` 后，需要你另开窗口确认 root 公钥登录正常，才会继续执行 `ssh-final`。家宽代理既可以按提示逐个填写，也可以选择一次性粘贴多行 CSV；上游节点可以直接逐行粘贴普通 `vless://` 或 VLESS Reality 分享链接，也可以粘贴 `tag,node_url,listen_port` CSV。
 
 ## 第一次使用
