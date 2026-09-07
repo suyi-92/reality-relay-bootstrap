@@ -641,7 +641,13 @@ vless-plain,vless://uuid@example.com:12345?type=tcp&encryption=none&security=non
 1. `listen_port` 可留空自动分配；填写时不能与 `DIRECT_PORT`、`home-proxies.csv` 或其他上游节点重复。
 2. `listen_port` 必须在 `HOME_PORT_START` 和 `HOME_PORT_END` 范围内。
 3. 上游节点链接里包含密码、UUID、Reality public key 等连接信息，不要公开、不要提交到 GitHub。
-4. 这不是简单 TCP 转发；客户端连你的 VPS，VPS 再用普通 VLESS TCP 或 VLESS Reality 连接上游节点。
+4. 客户端连接本机 VLESS+Reality 入口，本机再通过 TCP transport 使用普通 VLESS 或 VLESS Reality 连接上游；原有 Reality、Vision 及链接参数保持有效。
+
+`type=tcp` 指上游 VLESS transport，可代理的目标流量同时包括 TCP 和 UDP。生成的 VLESS outbound 省略 `network`，使用 sing-box 默认的 TCP+UDP 支持和 XUDP 编码；`type=ws`、`type=udp` 等不支持的 transport 仍会报错。参见 [sing-box 官方 VLESS outbound 文档](https://sing-box.sagernet.org/configuration/outbound/vless/)。
+
+实时通信、VoIP、Wi-Fi Calling 所需的 UDP（包括 UDP 500/4500）沿原有 inbound → 指定 outbound 映射转发，无需增加专用域名、IP 或端口规则。客户端与上游落地机也需要支持 UDP relay/XUDP。UDP 载荷封装在 VLESS TCP 连接内，UFW 仍只开放实际 VLESS TCP 入口端口。
+
+升级时保留现有 `upstream-nodes.txt` 格式和字段，保持 `RESET_PROXY_KEYS=false`，然后执行 `sudo bash bootstrap.sh --phase singbox` 重新生成配置、校验并重启服务。`home-proxies.csv` 的 SOCKS/HTTP `network` 语义不变。
 
 ---
 

@@ -259,7 +259,13 @@ vless-relay,vless://uuid@example.com:443?encryption=none&security=reality&flow=x
 vless-plain,vless://uuid@example.com:12345?type=tcp&encryption=none&security=none#vless-plain,51049
 ```
 
-也可以不写表头，只逐行放 `vless://` 节点链接；脚本会从 `HOME_PORT_START` 到 `HOME_PORT_END` 的空闲端口中自动分配。当前支持普通 VLESS TCP 和 VLESS Reality 上游。
+也可以不写表头，只逐行放 `vless://` 节点链接；脚本会从 `HOME_PORT_START` 到 `HOME_PORT_END` 的空闲端口中自动分配。当前支持普通 VLESS 和 VLESS Reality 上游，均使用 TCP transport。
+
+链接中的 `type=tcp` 表示上游 VLESS transport，不限制可代理的目标流量。生成器不设置 VLESS outbound 的 `network`，因此默认允许 TCP 和 UDP；UDP 默认使用 VLESS 的 XUDP 编码，详见 [sing-box 官方 VLESS outbound 文档](https://sing-box.sagernet.org/configuration/outbound/vless/)。Reality、Vision 和现有链接参数继续保留，不支持的 transport（例如 `type=ws`、`type=udp`）仍会被拒绝。
+
+这可承载实时通信、VoIP、Wi-Fi Calling 等应用的 UDP 流量。UDP 500/4500 与其他 UDP 目标一样沿固定的 inbound → 指定 outbound 转发，无需专用域名、IP 或端口分流规则；客户端与上游落地机也需要支持相应的 UDP relay/XUDP。VLESS 入口及上游连接仍使用 TCP，UFW 继续只放行实际使用的 VLESS TCP 入口端口。
+
+已有 `upstream-nodes.txt` 无需新增字段或更改格式。更新代码后，保持 `RESET_PROXY_KEYS=false`，执行 `sudo bash bootstrap.sh --phase singbox` 重新生成并校验配置、重启服务，即可应用此修复。`home-proxies.csv` 中 SOCKS/HTTP 代理的 `network` 语义保持不变。
 
 ## 标准执行流程
 
