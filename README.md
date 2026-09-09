@@ -73,6 +73,8 @@ bash <(wget -qO- https://raw.githubusercontent.com/suyi-92/reality-relay-bootstr
 sudo bash install.sh
 ```
 
+Cloudflare API Token 和逐条填写的家宽代理密码会按输入字符数显示 `*`，支持直接粘贴、退格删除和 `Ctrl+U` 清空；直接回车沿用提示中的默认值。输入明文不会显示在终端，按 `Ctrl+C` 可取消并恢复终端输入状态。
+
 一键脚本仍然保留 SSH 二阶段安全确认：完成 `ssh-phase1` 后，需要你另开窗口确认 root 公钥登录正常，才会继续执行 `ssh-final`。家宽代理既可以按提示逐个填写，也可以选择一次性粘贴多行 CSV；上游节点可以直接逐行粘贴普通 `vless://` 或 VLESS Reality 分享链接，也可以粘贴 `tag,node_url,listen_port` CSV。
 
 ## 第一次使用

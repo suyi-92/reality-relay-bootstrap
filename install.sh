@@ -90,23 +90,57 @@ read_default() {
   printf '%s\n' "$value"
 }
 
-read_secret_default() {
-  local prompt="$1" default_value="$2" value
+read_secret_default() (
+  local prompt="$1" default_value="$2" value="" key="" escape="" tty_fd tty_state
+  exec {tty_fd}<>"$INPUT_TTY"
+  tty_state="$(stty -g <&"$tty_fd")" || die "无法读取敏感输入终端状态。"
+  # Keep echo disabled throughout typing/pasting; isolate cleanup from the installer's traps.
+  trap 'stty "$tty_state" <&"$tty_fd" 2>/dev/null || true' EXIT
+  trap 'exit 129' HUP
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  stty -echo -icanon min 1 time 0 <&"$tty_fd" || die "无法关闭敏感输入的终端回显。"
   if [[ -n "$default_value" ]]; then
-    printf '%b' "${BOLD}${prompt}${RESET} ${DIM}[默认: 已填入，可直接回车]${RESET}: " >"$INPUT_TTY"
+    printf '%b' "${BOLD}${prompt}${RESET} ${DIM}[默认: 已填入，可直接回车]${RESET}: " >&"$tty_fd"
   else
-    printf '%b' "${BOLD}${prompt}${RESET}: " >"$INPUT_TTY"
+    printf '%b' "${BOLD}${prompt}${RESET}: " >&"$tty_fd"
   fi
-  stty -echo <"$INPUT_TTY" 2>/dev/null || true
-  IFS= read -r value <"$INPUT_TTY" || true
-  stty echo <"$INPUT_TTY" 2>/dev/null || true
-  printf '\n' >"$INPUT_TTY"
-  if [[ -z "$value" ]]; then
-    printf '%s\n' "$default_value"
-  else
-    printf '%s\n' "$value"
-  fi
-}
+  while true; do
+    if ! IFS= read -r -N 1 key <&"$tty_fd"; then
+      printf '\n' >&"$tty_fd"
+      return 1
+    fi
+    # Ignore cursor keys and bracketed-paste markers without adding them to the secret.
+    if [[ "$escape" == "start" ]]; then
+      escape=""
+      [[ "$key" == "[" || "$key" == "O" ]] && escape="sequence"
+      continue
+    elif [[ "$escape" == "sequence" ]]; then
+      [[ "$key" == [@-~] ]] && escape=""
+      continue
+    fi
+    case "$key" in
+      $'\n'|$'\r') break ;;
+      $'\177'|$'\b')
+        if [[ -n "$value" ]]; then
+          value="${value%?}"
+          printf '\b \b' >&"$tty_fd"
+        fi
+        ;;
+      $'\025')
+        while [[ -n "$value" ]]; do
+          value="${value%?}"
+          printf '\b \b' >&"$tty_fd"
+        done
+        ;;
+      $'\004') printf '\n' >&"$tty_fd"; return 1 ;;
+      $'\033') escape="start" ;;
+      [[:print:]]) value+="$key"; printf '*' >&"$tty_fd" ;;
+    esac
+  done
+  printf '\n' >&"$tty_fd"
+  printf '%s\n' "${value:-$default_value}"
+)
 
 read_yes_no() {
   local prompt="$1" default_value="${2:-yes}" value suffix
