@@ -92,7 +92,7 @@ sudo bash install.sh
 | `SUBSCRIPTION_INTERNAL_PORT` | `51040` | 订阅服务本机监听端口，供 Nginx fallback 反代 |
 | `SUBSCRIPTION_TARGET` | `ClashMeta` | 当前只生成 ClashMeta/Mihomo YAML |
 | `HOME_PORT_START` | `51043` | 出口入口端口自动分配起点 |
-| `ADMIN_PUBKEY` | 空回车结束 | 本地 SSH 公钥，可填写多个 |
+| `ADMIN_PUBKEY` | 必填；单独输入大写 `SKIP` 可跳过本次录入 | 支持一次性粘贴多行公钥，每行一把；已有公钥输入后用空行结束 |
 | `home-proxies.csv` | 可逐条提示，也可一次性粘贴多行 CSV | 家宽出口列表；字段顺序同模板 |
 | `upstream-nodes.txt` | 可选，空行结束 | 上游节点分享链接；支持 vless plain 和 vless reality |
 
@@ -308,7 +308,7 @@ CLASH_MIXED_PORT="7890"
 | `ADMIN_USER` | 兼容字段；当前固定使用 root，旧配置写其它值会被按 root 处理 | `root` |
 | `ADMIN_PUBKEY` | 本地 SSH 公钥；支持逐行多个 | `ssh-ed25519 AAAA...` |
 
-建议明确填写 `ADMIN_PUBKEY`。如果留空，脚本会复用 `/root/.ssh/authorized_keys`，但这依赖 root 当前已有正确公钥。
+一键安装时，管理员 SSH 公钥支持一次性粘贴多行，每行一把，完成后输入空行结束。尚未录入公钥时直接回车会警告并继续等待，格式不正确的行需要重新输入；只有单独输入大写 `SKIP` 才能跳过本次录入。分步骤编辑 `config.env` 时，`ADMIN_PUBKEY` 留空仍会复用 `/root/.ssh/authorized_keys`；两种跳过方式都依赖 root 当前已有正确公钥，否则后续 SSH 部署检查会停止。
 
 需要给多个管理员设备授权时，有两种写法：
 

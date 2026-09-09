@@ -75,6 +75,8 @@ sudo bash install.sh
 
 Cloudflare API Token 和逐条填写的家宽代理密码会按输入字符数显示 `*`，支持直接粘贴、退格删除和 `Ctrl+U` 清空；直接回车沿用提示中的默认值。输入明文不会显示在终端，按 `Ctrl+C` 可取消并恢复终端输入状态。
 
+管理员 SSH 公钥支持一次性粘贴多行，每行一把，完成后输入空行结束。尚未录入公钥时直接回车会警告并继续等待，格式不正确的行也会提示重新输入；只有单独输入大写 `SKIP` 才能跳过本次录入。跳过后仍需 root 已有可用公钥，否则后续 SSH 部署检查会停止。
+
 一键脚本仍然保留 SSH 二阶段安全确认：完成 `ssh-phase1` 后，需要你另开窗口确认 root 公钥登录正常，才会继续执行 `ssh-final`。家宽代理既可以按提示逐个填写，也可以选择一次性粘贴多行 CSV；上游节点可以直接逐行粘贴普通 `vless://` 或 VLESS Reality 分享链接，也可以粘贴 `tag,node_url,listen_port` CSV。
 
 ## 第一次使用
@@ -124,7 +126,7 @@ MODE_443="direct"
 
 新配置推荐填写 `SERVER_IP_IPV4` 和/或 `SERVER_IP_IPV6`；`SERVER_IP` 仍保留为旧配置兼容字段，脚本会自动把它归并到对应的 IPv4/IPv6 字段。当前管理用户固定为 root，非 root 的 `ADMIN_USER` 会被警告并按 root 处理。
 
-如果 root 已经有正确公钥，`ADMIN_PUBKEY` 可以留空，脚本会复用 `/root/.ssh/authorized_keys`。分步骤运行时，`ADMIN_PUBKEY` 支持用 `$'key1\nkey2'` 写多个公钥，也可以把额外公钥逐行写入 `ADMIN_PUBKEYS`；一键脚本会逐条提示添加多个 `ADMIN_PUBKEY`。
+分步骤运行时，如果 root 已经有正确公钥，`ADMIN_PUBKEY` 可以留空，脚本会复用 `/root/.ssh/authorized_keys`；多个公钥可用 `$'key1\nkey2'` 写入 `ADMIN_PUBKEY`，也可以把额外公钥逐行写入 `ADMIN_PUBKEYS`。一键安装时直接粘贴多行公钥，输入空行结束；若要复用服务器已有公钥，需明确输入 `SKIP`。
 
 ## VLESS+Reality 参数
 

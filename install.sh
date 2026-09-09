@@ -215,26 +215,51 @@ default_authorized_keys() {
 }
 
 collect_admin_pubkeys() {
-  local keys_file="$1" index=1 key
+  local keys_file="$1" count=0 key keys_fd
+  local key_pattern='^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp[0-9]+|sk-ssh-ed25519@openssh.com|sk-ecdsa-sha2-nistp256@openssh.com)[[:space:]]+[A-Za-z0-9+/]+={0,2}([[:space:]].*)?$'
   : >"$keys_file"
 
   line
   printf '%b\n' "${CYAN}${BOLD}管理员 SSH 公钥${RESET}"
-  printf '%b\n' "${DIM}这些公钥会写入 root 的 authorized_keys；留空回车结束。${RESET}"
+  printf '%b\n' "${DIM}请一次性粘贴多行 SSH 公钥，每行一把；输入完成后，再输入一个空行结束。${RESET}"
+  printf '%b\n' "${DIM}至少输入一把公钥。若明确跳过本次录入，请单独输入大写 SKIP；后续 SSH 部署将使用 root 已有的 authorized_keys。${RESET}"
+  exec {keys_fd}<"$INPUT_TTY"
   while true; do
-    key="$(read_default "ADMIN_PUBKEY #${index}" "")"
-    if [[ -n "$key" ]]; then
-      printf '%s\n' "$key" >>"$keys_file"
-    elif (( index > 1 )); then
-      break
-    else
-      die "ADMIN_PUBKEY 不能为空；请至少粘贴一个本地 SSH 公钥。"
+    printf '%b' "> " >"$INPUT_TTY"
+    if ! IFS= read -r key <&"$keys_fd"; then
+      exec {keys_fd}<&-
+      die "SSH 公钥输入已中断；未确认本次录入。请重新运行安装，若要跳过请明确输入 SKIP。"
     fi
-
-    index=$((index + 1))
+    key="${key//$'\033[200~'/}"
+    key="${key//$'\033[201~'/}"
+    key="${key%$'\r'}"
+    key="${key#"${key%%[![:space:]]*}"}"
+    key="${key%"${key##*[![:space:]]}"}"
+    if [[ "$key" == "SKIP" ]]; then
+      if (( count > 0 )); then
+        warn "已录入 ${count} 把公钥；请用空行确认，SKIP 仅用于尚未录入公钥时跳过。"
+        continue
+      fi
+      exec {keys_fd}<&-
+      warn "已明确跳过本次公钥录入。若 root 尚无可用 authorized_keys，后续 SSH 部署检查仍会停止。"
+      return 0
+    fi
+    if [[ -z "$key" ]]; then
+      if (( count > 0 )); then
+        break
+      fi
+      warn "尚未输入管理员 SSH 公钥；请至少粘贴一把公钥，或明确输入 SKIP 跳过。"
+      continue
+    fi
+    if [[ ! "$key" =~ $key_pattern ]]; then
+      warn "这一行不是支持的 SSH 公钥格式，未保存。请重新粘贴完整公钥，每行一把。"
+      continue
+    fi
+    printf '%s\n' "$key" >>"$keys_file"
+    count=$((count + 1))
   done
-
-  [[ -s "$keys_file" ]] || die "ADMIN_PUBKEY 不能为空；请至少粘贴一个本地 SSH 公钥。"
+  exec {keys_fd}<&-
+  info "已接收 ${count} 把管理员 SSH 公钥。"
 }
 
 read_bool_value() {
