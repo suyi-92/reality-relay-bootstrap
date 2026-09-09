@@ -539,6 +539,38 @@ ssh_service_name() {
   fi
 }
 
+remove_legacy_sshd_dropins() {
+  local path
+  for path in /etc/ssh/sshd_config.d/00-reality-relay-bootstrap-{phase1,hardening}.conf; do
+    if is_dry_run; then
+      log "DRY-RUN: remove legacy managed SSH drop-in $path"
+    else
+      rm -f -- "$path"
+    fi
+  done
+}
+
+write_sshd_policy() {
+  if is_dry_run; then
+    log "DRY-RUN: write the current phase SSH policy at the start of /etc/ssh/sshd_config"
+    cat >/dev/null
+  else
+    python3 "$SCRIPT_DIR/sshd_policy.py" --config /etc/ssh/sshd_config --apply || return $?
+  fi
+  # Both SSH phases back up sshd_config and the drop-in directory before calling this.
+  remove_legacy_sshd_dropins
+  info "本阶段 SSH 策略已优先放置于主配置开头。"
+}
+
+remove_sshd_policy() {
+  if is_dry_run; then
+    log "DRY-RUN: remove the managed SSH policy block from /etc/ssh/sshd_config"
+  else
+    python3 "$SCRIPT_DIR/sshd_policy.py" --config /etc/ssh/sshd_config --remove || return $?
+  fi
+  remove_legacy_sshd_dropins
+}
+
 sshd_bin() {
   if [[ -x /usr/sbin/sshd ]]; then
     echo /usr/sbin/sshd

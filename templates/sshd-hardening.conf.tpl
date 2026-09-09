@@ -1,7 +1,7 @@
-# /etc/ssh/sshd_config.d/00-reality-relay-bootstrap-hardening.conf
-# Template only. The script renders ADMIN_USER/SFTP_USER dynamically.
+# Managed SSH policy block at the start of /etc/ssh/sshd_config.
+# Template only. The script renders root/SFTP_USER dynamically.
 
-PermitRootLogin no
+PermitRootLogin prohibit-password
 PubkeyAuthentication yes
 PasswordAuthentication no
 KbdInteractiveAuthentication no

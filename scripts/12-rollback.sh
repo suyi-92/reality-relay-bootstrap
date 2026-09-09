@@ -19,15 +19,6 @@ latest_backup() {
   find "$BACKUP_ROOT" -maxdepth 1 -type d -name 'backup-*' 2>/dev/null | sort | tail -n 1
 }
 
-remove_file_safe() {
-  local path="$1"
-  if is_dry_run; then
-    log "DRY-RUN: rm -f $path"
-  else
-    rm -f "$path"
-  fi
-}
-
 copy_safe() {
   local src="$1" dst="$2"
   if is_dry_run; then
@@ -56,16 +47,15 @@ move_safe() {
 }
 
 ROLLBACK_DIR="$(latest_backup || true)"
-[[ -n "$ROLLBACK_DIR" ]] || warn "没有找到备份目录，将仅移除本项目管理的 SSH drop-in。"
+[[ -n "$ROLLBACK_DIR" ]] || warn "没有找到备份目录，将仅移除本项目管理的 SSH 策略。"
 
 backup_path /etc/ssh/sshd_config || true
 [[ -d /etc/ssh/sshd_config.d ]] && backup_path /etc/ssh/sshd_config.d || true
 backup_path /etc/sing-box/config.json || true
 backup_path /etc/ufw || true
 
-info "移除本项目 SSH 加固 drop-in。"
-remove_file_safe /etc/ssh/sshd_config.d/00-reality-relay-bootstrap-hardening.conf
-remove_file_safe /etc/ssh/sshd_config.d/00-reality-relay-bootstrap-phase1.conf
+info "移除本项目 SSH 策略块和旧版 drop-in。"
+remove_sshd_policy
 
 if is_dry_run; then
   log "DRY-RUN: remove managed SFTP Match block from /etc/ssh/sshd_config"

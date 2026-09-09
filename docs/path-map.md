@@ -24,8 +24,8 @@
 | `/etc/reality-relay-bootstrap/subscription/all/clashmeta.yaml` | 订阅文件 | `subscription` | `600` | 是 | token 保护订阅返回的 ClashMeta 内容。 |
 | `/etc/sing-box/config.json` | sing-box 配置 | `singbox` | 由 sing-box/系统决定 | 是 | 最终服务端配置，包含 Reality 私钥和出站信息。会先备份再覆盖。 |
 | `/etc/sing-box/conf.233boy.disabled.TIMESTAMP` | 233boy 隔离目录 | `singbox`（仅启用 233boy） | 原目录权限 | 可能 | 避免 233boy 默认配置和本项目配置冲突。确认不需要恢复后可手动清理。 |
-| `/etc/ssh/sshd_config.d/00-reality-relay-bootstrap-phase1.conf` | SSH drop-in | `ssh-phase1` | `0644` | 否 | 第一阶段 SSH 安全配置，不禁 root、不禁密码。 |
-| `/etc/ssh/sshd_config.d/00-reality-relay-bootstrap-hardening.conf` | SSH drop-in | `ssh-final` | `0644` | 否 | 最终 SSH 加固配置。确认 root 公钥登录成功后才写入。 |
+| `/etc/ssh/sshd_config` 中的 `reality-relay-bootstrap SSH policy` 标记块 | SSH 当前阶段策略 | `ssh-phase1` / `ssh-final` | 保留原文件权限 | 否 | 放在主配置开头，优先于服务商配置；phase1 仅开启公钥认证，final 经确认后禁用密码认证。块外内容在策略更新时按原字节保留。 |
+| `/etc/ssh/sshd_config.d/00-reality-relay-bootstrap-{phase1,hardening}.conf` | 旧版 SSH drop-in | 旧版安装 | `0644` | 否 | 新版执行任一 SSH 阶段时先备份再移除这两个旧文件，其他 drop-in 保留。 |
 | `/root/.ssh/authorized_keys` | root 公钥 | `ssh-phase1` | `600` | 是 | root 登录公钥。不要随意清空，避免锁机。 |
 | `/etc/fail2ban/jail.d/sshd.local` | fail2ban 配置 | `fail2ban` | `0644` | 否 | SSH jail 配置。会先备份 `/etc/fail2ban`。 |
 | `/etc/ufw/` | UFW 配置目录 | `ufw` / `firewall` | 系统默认 | 否 | 脚本会放行 SSH、Reality 入口端口和必要订阅端口。默认回滚不整目录恢复 UFW。 |

@@ -15,6 +15,8 @@ sudo /usr/sbin/sshd -T -C user=root,host=localhost,addr=127.0.0.1
 sudo CONFIRM_ROLLBACK=yes bash bootstrap.sh --phase rollback
 ```
 
+默认回滚会移除 `/etc/ssh/sshd_config` 开头的本项目 SSH 策略标记块，以及旧版的两个项目 drop-in；服务商配置会重新参与生效值选择。完整 SSH 备份恢复包含主配置中的策略块，可恢复到所选备份对应的阶段。
+
 ## 完整 SSH 配置回滚
 
 ```bash

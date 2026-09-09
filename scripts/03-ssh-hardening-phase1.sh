@@ -10,15 +10,7 @@ backup_path /etc/ssh/sshd_config
 [[ -d /etc/ssh/sshd_config.d ]] && backup_path /etc/ssh/sshd_config.d
 ensure_sshd_dropin_include
 
-if [[ -f /etc/ssh/sshd_config.d/00-reality-relay-bootstrap-hardening.conf ]]; then
-  if is_dry_run; then
-    log "DRY-RUN: remove old final hardening drop-in before phase1"
-  else
-    rm -f /etc/ssh/sshd_config.d/00-reality-relay-bootstrap-hardening.conf
-  fi
-fi
-
-write_root_file /etc/ssh/sshd_config.d/00-reality-relay-bootstrap-phase1.conf 0644 <<'EOF'
+write_sshd_policy <<'EOF'
 # Managed by reality-relay-bootstrap phase1.
 # Phase1 only enables public key authentication. It intentionally does NOT
 # disable root login or password login. Final hardening is a separate phase.

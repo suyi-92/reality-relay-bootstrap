@@ -44,6 +44,7 @@ reality-relay-bootstrap/
     14-setup-cloudflare-dns.sh
     14-setup-cloudflare-dns.py
     15-setup-custom-domain.sh
+    sshd_policy.py
   templates/
     sshd-hardening.conf.tpl
     fail2ban-sshd.local.tpl
@@ -259,7 +260,9 @@ sudo bash bootstrap.sh --phase validate
 
 ## SSH 二阶段说明
 
-`ssh-phase1` 会给 root 安装 SSH 公钥、可选创建 SFTP-only 用户、写入 phase1 drop-in，只开启公钥登录，不禁 root、不禁密码。
+`ssh-phase1` 会给 root 安装 SSH 公钥、可选创建 SFTP-only 用户，并在 `/etc/ssh/sshd_config` 开头写入本项目管理的 phase1 策略块，只开启公钥登录，不禁 root、不禁密码。
+
+OpenSSH 对多数配置项采用先读取到的值。服务商的 `00-mofang.conf` 等文件可能比旧版项目 drop-in 更早加载，导致最终加固的 `PermitRootLogin`、`PasswordAuthentication` 被抢先设置；这同样会发生在 Debian 13。现在两个 SSH 阶段都将当前策略放到主配置最前面，先备份再清理旧版项目 drop-in，服务商配置文件保持原样。阶段重跑会替换本项目策略块，`ssh-phase1` 会移除上一次 final 的项目策略；`Match` 条件仍按 OpenSSH 规则生效，冲突时继续阻止 reload，并显示实际值。
 
 不要关闭当前 SSH 窗口。另开 Windows PowerShell 测试：
 

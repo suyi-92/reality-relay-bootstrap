@@ -714,6 +714,8 @@ sudo CONFIRM_ROOT_KEY_LOGIN=yes bash bootstrap.sh --phase ssh-final
 - 检查 `sshd -T` 生效值。
 - 通过后 reload/restart SSH。
 
+两个 SSH 阶段都把当前阶段的项目策略写在 `/etc/ssh/sshd_config` 开头，以避免 `00-mofang.conf` 等服务商文件先设置同名选项。更新前会备份主配置及 drop-in 目录，旧版的两个项目 drop-in 会迁移清理。重跑 phase1 会替换 final 的项目策略，回滚会移除项目标记块；服务商文件不需要手动改写。若 `Match` 条件仍造成冲突，最终加固会显示实际值并停止 reload。
+
 执行后再次另开窗口测试：
 
 ```powershell
